@@ -105,6 +105,23 @@ func lNumberIsZero(v LNumber) bool {
 	return lNumberCmp(v, LNumberZero) == 0
 }
 
+// uint256SignBit = 2^255 — the threshold for two's complement "negative" values.
+var uint256SignBit = new(big.Int).Lsh(big.NewInt(1), 255)
+
+// lNumberIsNeg reports whether n is "negative" in EVM two's complement uint256
+// semantics: a value with bit 255 set (i.e. v >= 2^255) is considered negative.
+//
+// This is consistent with EVM signed opcodes (SDIV, SLT, SGT, SAR, SIGNEXTEND)
+// and makes numeric for-loop step direction work as expected:
+//
+//	for i = 5, 1, -1 do … end
+//
+// compiles to step = 2^256-1 (Lua's -1), which has bit 255 set → negative →
+// the loop counts down from 5 to 1 as the programmer intends.
+func lNumberIsNeg(n LNumber) bool {
+	return lNumberToBigInt(n).Cmp(uint256SignBit) >= 0
+}
+
 func wrapUint256(v *big.Int) LNumber {
 	v.Mod(v, uint256Mod)
 	if v.Sign() < 0 {

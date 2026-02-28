@@ -1617,8 +1617,12 @@ func init() {
 								rg.top = regi + 1
 							}
 						}
-						if (lNumberCmp(step, LNumberZero) > 0 && lNumberCmp(v, limit) <= 0) ||
-							(lNumberCmp(step, LNumberZero) <= 0 && lNumberCmp(v, limit) >= 0) {
+						// Use two's complement sign semantics (bit 255) to determine
+						// loop direction — consistent with EVM SDIV/SLT/SGT/SAR:
+						//   step "negative" (bit 255 set)  → count down: continue while v >= limit
+						//   step "positive" (bit 255 clear) → count up:   continue while v <= limit
+						if (!lNumberIsNeg(step) && lNumberCmp(v, limit) <= 0) ||
+							(lNumberIsNeg(step) && lNumberCmp(v, limit) >= 0) {
 							Sbx := int(inst&0x3ffff) - opMaxArgSbx //GETSBX
 							cf.Pc += Sbx
 							// this section is inlined by go-inline
