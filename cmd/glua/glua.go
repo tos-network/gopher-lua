@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"strconv"
@@ -17,22 +18,28 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p string
-	var opt_i, opt_v, opt_dt, opt_dc bool
+	var opt_e, opt_l, opt_p, opt_c string
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
+	flag.StringVar(&opt_c, "c", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
 	flag.BoolVar(&opt_dt, "dt", false, "")
 	flag.BoolVar(&opt_dc, "dc", false, "")
+	flag.BoolVar(&opt_di, "di", false, "")
+	flag.BoolVar(&opt_bc, "bc", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: glua [options] [script [args]].
 	Available options are:
 	  -e stat  execute string 'stat'
 	  -l name  require library 'name'
+	  -c file  compile source script to bytecode file
+	  -bc      treat input script as bytecode
 	  -dt      dump AST trees
 	  -dc      dump VM codes
+	  -di      dump IR
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -69,6 +76,29 @@ func mainAux() int {
 		}
 	}
 
+	if len(opt_c) > 0 {
+		if flag.NArg() == 0 {
+			fmt.Println("compile mode requires an input source script")
+			return 1
+		}
+		input := flag.Arg(0)
+		src, err := os.ReadFile(input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		bc, err := lua.CompileSourceToBytecode(src, input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		if err := os.WriteFile(opt_c, bc, 0o644); err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		return 0
+	}
+
 	if nargs := flag.NArg(); nargs > 0 {
 		script := flag.Arg(0)
 		argtb := L.NewTable()
@@ -76,36 +106,64 @@ func mainAux() int {
 			L.RawSet(argtb, lua.LNumber(strconv.Itoa(i)), lua.LString(flag.Arg(i)))
 		}
 		L.SetGlobal("arg", argtb)
-		if opt_dt || opt_dc {
-			file, err := os.Open(script)
-			if err != nil {
-				fmt.Println(err.Error())
-				return 1
-			}
-			chunk, err2 := parse.Parse(file, script)
-			if err2 != nil {
-				fmt.Println(err2.Error())
-				return 1
-			}
-			if opt_dt {
-				fmt.Println(parse.Dump(chunk))
-			}
-			if opt_dc {
-				proto, err3 := lua.Compile(chunk, script)
-				if err3 != nil {
-					fmt.Println(err3.Error())
-					return 1
-				}
-				fmt.Println(proto.String())
-			}
-		}
 		src, err := os.ReadFile(script)
 		if err != nil {
 			fmt.Println(err.Error())
 			status = 1
-		} else if err := L.DoString(string(src)); err != nil {
-			fmt.Println(err.Error())
-			status = 1
+		} else {
+			if opt_dt || opt_dc || opt_di {
+				if opt_bc {
+					if opt_dt {
+						fmt.Println("-dt is source-only (AST unavailable for bytecode input)")
+						return 1
+					}
+					proto, err := lua.DecodeFunctionProto(src)
+					if err != nil {
+						fmt.Println(err.Error())
+						return 1
+					}
+					if opt_dc {
+						fmt.Println(proto.String())
+					}
+					if opt_di {
+						fmt.Println(lua.BuildIRFromProto(proto, script).String())
+					}
+				} else {
+					chunk, err := parse.Parse(bytes.NewReader(src), script)
+					if err != nil {
+						fmt.Println(err.Error())
+						return 1
+					}
+					if opt_dt {
+						fmt.Println(parse.Dump(chunk))
+					}
+					if opt_dc {
+						proto, err := lua.Compile(chunk, script)
+						if err != nil {
+							fmt.Println(err.Error())
+							return 1
+						}
+						fmt.Println(proto.String())
+					}
+					if opt_di {
+						program, err := lua.BuildIR(chunk, script)
+						if err != nil {
+							fmt.Println(err.Error())
+							return 1
+						}
+						fmt.Println(program.String())
+					}
+				}
+			}
+			if opt_bc {
+				if err := L.DoBytecode(src); err != nil {
+					fmt.Println(err.Error())
+					status = 1
+				}
+			} else if err := L.DoString(string(src)); err != nil {
+				fmt.Println(err.Error())
+				status = 1
+			}
 		}
 	}
 

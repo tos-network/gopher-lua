@@ -410,6 +410,24 @@ func (ls *LState) LoadString(source string) (*LFunction, error) {
 	return ls.Load(strings.NewReader(source), "<string>")
 }
 
+// LoadIR compiles IR into bytecode and returns an executable Lua function.
+func (ls *LState) LoadIR(program *IRProgram) (*LFunction, error) {
+	proto, err := CompileIR(program)
+	if err != nil {
+		return nil, newApiErrorE(ApiErrorSyntax, err)
+	}
+	return newLFunctionL(proto, ls.currentEnv(), 0), nil
+}
+
+// LoadBytecode loads a precompiled bytecode blob.
+func (ls *LState) LoadBytecode(data []byte) (*LFunction, error) {
+	proto, err := DecodeFunctionProto(data)
+	if err != nil {
+		return nil, newApiErrorE(ApiErrorSyntax, err)
+	}
+	return newLFunctionL(proto, ls.currentEnv(), 0), nil
+}
+
 func (ls *LState) DoString(source string) error {
 	if fn, err := ls.LoadString(source); err != nil {
 		return err
@@ -417,6 +435,16 @@ func (ls *LState) DoString(source string) error {
 		ls.Push(fn)
 		return ls.PCall(0, MultRet, nil)
 	}
+}
+
+// DoBytecode executes precompiled bytecode.
+func (ls *LState) DoBytecode(data []byte) error {
+	fn, err := ls.LoadBytecode(data)
+	if err != nil {
+		return err
+	}
+	ls.Push(fn)
+	return ls.PCall(0, MultRet, nil)
 }
 
 /* }}} */

@@ -1945,7 +1945,7 @@ func patchCode(context *funcContext) { // {{{
 	context.Proto.NumUsedRegisters = uint8(maxreg)
 } // }}}
 
-func Compile(chunk []ast.Stmt, name string) (proto *FunctionProto, err error) { // {{{
+func compileASTToProtoDirect(chunk []ast.Stmt, name string) (proto *FunctionProto, err error) { // {{{
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			if _, ok := rcv.(*CompileError); ok {
@@ -1967,3 +1967,13 @@ func Compile(chunk []ast.Stmt, name string) (proto *FunctionProto, err error) { 
 	proto = context.Proto
 	return
 } // }}}
+
+// Compile compiles AST statements using a multi-stage pipeline:
+// AST -> IR -> bytecode(FunctionProto).
+func Compile(chunk []ast.Stmt, name string) (proto *FunctionProto, err error) {
+	program, err := BuildIR(chunk, name)
+	if err != nil {
+		return nil, err
+	}
+	return CompileIR(program)
+}

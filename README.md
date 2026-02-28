@@ -126,6 +126,40 @@ make lua54-subset-test
 The test suite is stored in `./_lua54-subset-test` and controlled by
 `manifest.tsv` (runtime/compile modes).
 
+## Contract Bytecode Workflow
+
+Compile source to bytecode:
+
+```bash
+glua -c contract.glbc contract.lua
+```
+
+Execute bytecode:
+
+```bash
+glua -bc contract.glbc
+```
+
+Dump IR from source or bytecode:
+
+```bash
+glua -di contract.lua
+glua -di -bc contract.glbc
+```
+
+Programmatic APIs:
+
+- `BuildIR` / `CompileIR` for `AST -> IR -> bytecode`
+- `CompileSourceToBytecode` to produce bytecode blobs
+- `LState.DoBytecode` / `LState.LoadBytecode` to execute precompiled contracts
+- `LState.Load` auto-detects bytecode by magic header
+
+Bytecode safety checks:
+
+- format version check
+- VM fingerprint check (package/language/numeric/opcode profile)
+- payload SHA-256 integrity check
+
 ## glua CLI
 
 ```bash
@@ -136,7 +170,7 @@ go build ./cmd/glua
 ## Module
 
 ```
-github.com/tos-network/gopher-lua
+github.com/tos-network/glua
 ```
 
 Forked from [yuin/gopher-lua](https://github.com/yuin/gopher-lua) (MIT).
