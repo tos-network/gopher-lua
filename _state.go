@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/tos-network/gopher-lua/parse"
+	"github.com/tos-network/golua/parse"
 )
 
 const MultRet = -1

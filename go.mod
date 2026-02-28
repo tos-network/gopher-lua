@@ -1,4 +1,4 @@
-module github.com/tos-network/gopher-lua
+module github.com/tos-network/golua
 
 go 1.17
 

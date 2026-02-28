@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/tos-network/gopher-lua/ast"
+	"github.com/tos-network/golua/ast"
 )
 
 const EOF = -1

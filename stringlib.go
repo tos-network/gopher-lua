@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tos-network/gopher-lua/pm"
+	"github.com/tos-network/golua/pm"
 )
 
 const emptyLString LString = LString("")

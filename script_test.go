@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tos-network/gopher-lua/parse"
+	"github.com/tos-network/golua/parse"
 )
 
 var gluaTests []string = []string{
