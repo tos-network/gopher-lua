@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"github.com/chzyer/readline"
-	"github.com/yuin/gopher-lua"
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/tos-network/gopher-lua"
+	"github.com/tos-network/gopher-lua/parse"
 	"os"
 	"runtime/pprof"
 )

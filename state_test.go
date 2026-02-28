@@ -406,12 +406,11 @@ func TestContextTimeout(t *testing.T) {
 	L.SetContext(ctx)
 	errorIfNotEqual(t, ctx, L.Context())
 	err := L.DoString(`
-	  local clock = os.clock
-      function sleep(n)  -- seconds
-        local t0 = clock()
-        while clock() - t0 <= n do end
+      local function spin(n)
+        local i = 0
+        while i < n do i = i + 1 end
       end
-	  sleep(3)
+      spin(1000000000)
 	`)
 	errorIfNil(t, err)
 	errorIfFalse(t, strings.Contains(err.Error(), "context deadline exceeded"), "execution must be canceled")
@@ -429,12 +428,11 @@ func TestContextCancel(t *testing.T) {
 	L.SetContext(ctx)
 	go func() {
 		errch <- L.DoString(`
-	    local clock = os.clock
-        function sleep(n)  -- seconds
-          local t0 = clock()
-          while clock() - t0 <= n do end
-        end
-	    sleep(3)
+          local function spin(n)
+            local i = 0
+            while i < n do i = i + 1 end
+          end
+          spin(1000000000)
 	  `)
 	}()
 	time.Sleep(1 * time.Second)
@@ -758,5 +756,34 @@ func BenchmarkRegistrySetTop(t *testing.B) {
 	for j := 0; j < t.N; j++ {
 		reg.SetTop(sz)
 		reg.SetTop(0)
+	}
+}
+
+func TestGasLimitExceeded(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+	L.SetGasLimit(100)
+	err := L.DoString(`while true do end`)
+	if err == nil {
+		t.Fatal("expected gas limit error, got nil")
+	}
+	if !strings.Contains(err.Error(), "gas limit exceeded") {
+		t.Fatalf("expected 'gas limit exceeded' in error, got: %v", err)
+	}
+	if L.GasUsed() != 101 {
+		t.Fatalf("expected GasUsed=101, got %d", L.GasUsed())
+	}
+}
+
+func TestGasNotExceeded(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+	L.SetGasLimit(10000)
+	err := L.DoString(`local x = 0; for i = 1, 10 do x = x + i end`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if L.GasUsed() == 0 {
+		t.Fatal("expected GasUsed > 0")
 	}
 }

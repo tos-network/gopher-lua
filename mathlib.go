@@ -2,7 +2,6 @@ package lua
 
 import (
 	"math"
-	"math/rand"
 )
 
 func OpenMath(L *LState) int {
@@ -36,8 +35,6 @@ var mathFuncs = map[string]LGFunction{
 	"modf":       mathModf,
 	"pow":        mathPow,
 	"rad":        mathRad,
-	"random":     mathRandom,
-	"randomseed": mathRandomseed,
 	"sin":        mathSin,
 	"sinh":       mathSinh,
 	"sqrt":       mathSqrt,
@@ -183,25 +180,6 @@ func mathRad(L *LState) int {
 	return 1
 }
 
-func mathRandom(L *LState) int {
-	switch L.GetTop() {
-	case 0:
-		L.Push(LNumber(rand.Float64()))
-	case 1:
-		n := L.CheckInt(1)
-		L.Push(LNumber(rand.Intn(n) + 1))
-	default:
-		min := L.CheckInt(1)
-		max := L.CheckInt(2) + 1
-		L.Push(LNumber(rand.Intn(max-min) + min))
-	}
-	return 1
-}
-
-func mathRandomseed(L *LState) int {
-	rand.Seed(L.CheckInt64(1))
-	return 0
-}
 
 func mathSin(L *LState) int {
 	L.Push(LNumber(math.Sin(float64(L.CheckNumber(1)))))

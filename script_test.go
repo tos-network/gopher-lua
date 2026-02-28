@@ -9,17 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/tos-network/gopher-lua/parse"
 )
 
 const maxMemory = 40
 
 var gluaTests []string = []string{
-	"base.lua",
+	// "base.lua",   -- uses dofile (removed)
 	"coroutine.lua",
 	"db.lua",
-	"issues.lua",
-	"os.lua",
+	// "issues.lua", -- uses math.random (removed)
+	// "os.lua",     -- uses os lib (removed)
 	"table.lua",
 	"vm.lua",
 	"math.lua",
@@ -28,19 +28,19 @@ var gluaTests []string = []string{
 }
 
 var luaTests []string = []string{
-	"attrib.lua",
-	"calls.lua",
+	// "attrib.lua",    -- uses require (removed)
+	// "calls.lua",     -- uses require (removed)
 	"closure.lua",
 	"constructs.lua",
-	"events.lua",
-	"literals.lua",
+	// "events.lua",    -- uses collectgarbage/os
+	// "literals.lua",  -- uses os.setlocale (removed)
 	"locals.lua",
-	"math.lua",
-	"sort.lua",
-	"strings.lua",
+	// "math.lua",      -- uses io.tmpfile (removed)
+	// "sort.lua",      -- uses require (removed)
+	// "strings.lua",   -- uses os.setlocale (removed)
 	"vararg.lua",
 	"pm.lua",
-	"files.lua",
+	// "files.lua",     -- uses io (removed)
 }
 
 func testScriptCompile(t *testing.T, script string) {

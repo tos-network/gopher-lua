@@ -24,6 +24,13 @@ func mainLoop(L *LState, baseframe *callFrame) {
 		cf = L.currentFrame
 		inst = cf.Fn.Proto.Code[cf.Pc]
 		cf.Pc++
+		if L.gasLimit > 0 {
+			L.gasUsed++
+			if L.gasUsed > L.gasLimit {
+				L.RaiseError("lua: gas limit exceeded")
+				return
+			}
+		}
 		if jumpTable[int(inst>>26)](L, inst, baseframe) == 1 {
 			return
 		}
@@ -48,6 +55,13 @@ func mainLoopWithContext(L *LState, baseframe *callFrame) {
 		cf = L.currentFrame
 		inst = cf.Fn.Proto.Code[cf.Pc]
 		cf.Pc++
+		if L.gasLimit > 0 {
+			L.gasUsed++
+			if L.gasUsed > L.gasLimit {
+				L.RaiseError("lua: gas limit exceeded")
+				return
+			}
+		}
 		select {
 		case <-L.ctx.Done():
 			L.RaiseError(L.ctx.Err().Error())

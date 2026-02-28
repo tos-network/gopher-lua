@@ -195,7 +195,21 @@ type LState struct {
 	mainLoop     func(*LState, *callFrame)
 	ctx          context.Context
 	ctxCancelFn  context.CancelFunc
+
+	// Gas metering: set via SetGasLimit before execution.
+	gasLimit uint64
+	gasUsed  uint64
 }
+
+// SetGasLimit configures the maximum number of VM instructions this LState
+// may execute. Must be called before DoString/DoFile/Call. Zero means unlimited.
+func (ls *LState) SetGasLimit(limit uint64) {
+	ls.gasLimit = limit
+	ls.gasUsed = 0
+}
+
+// GasUsed returns the number of VM instructions executed so far.
+func (ls *LState) GasUsed() uint64 { return ls.gasUsed }
 
 func (ls *LState) String() string   { return fmt.Sprintf("thread: %p", ls) }
 func (ls *LState) Type() LValueType { return LTThread }
