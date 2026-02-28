@@ -1,126 +1,43 @@
 package lua
 
-import (
-	"math"
-)
-
 func OpenMath(L *LState) int {
 	mod := L.RegisterModule(MathLibName, mathFuncs).(*LTable)
-	mod.RawSetString("pi", LNumber(math.Pi))
-	mod.RawSetString("huge", LNumber(math.MaxFloat64))
 	L.Push(mod)
 	return 1
 }
 
 var mathFuncs = map[string]LGFunction{
-	"abs":        mathAbs,
-	"acos":       mathAcos,
-	"asin":       mathAsin,
-	"atan":       mathAtan,
-	"atan2":      mathAtan2,
-	"ceil":       mathCeil,
-	"cos":        mathCos,
-	"cosh":       mathCosh,
-	"deg":        mathDeg,
-	"exp":        mathExp,
-	"floor":      mathFloor,
-	"fmod":       mathFmod,
-	"frexp":      mathFrexp,
-	"ldexp":      mathLdexp,
-	"log":        mathLog,
-	"log10":      mathLog10,
-	"max":        mathMax,
-	"min":        mathMin,
-	"mod":        mathMod,
-	"modf":       mathModf,
-	"pow":        mathPow,
-	"rad":        mathRad,
-	"sin":        mathSin,
-	"sinh":       mathSinh,
-	"sqrt":       mathSqrt,
-	"tan":        mathTan,
-	"tanh":       mathTanh,
+	"abs":   mathAbs,
+	"ceil":  mathCeil,
+	"floor": mathFloor,
+	"fmod":  mathFmod,
+	"max":   mathMax,
+	"min":   mathMin,
+	"mod":   mathMod,
+	"pow":   mathPow,
 }
 
 func mathAbs(L *LState) int {
-	L.Push(LNumber(math.Abs(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathAcos(L *LState) int {
-	L.Push(LNumber(math.Acos(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathAsin(L *LState) int {
-	L.Push(LNumber(math.Asin(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathAtan(L *LState) int {
-	L.Push(LNumber(math.Atan(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathAtan2(L *LState) int {
-	L.Push(LNumber(math.Atan2(float64(L.CheckNumber(1)), float64(L.CheckNumber(2)))))
+	L.Push(L.CheckNumber(1))
 	return 1
 }
 
 func mathCeil(L *LState) int {
-	L.Push(LNumber(math.Ceil(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathCos(L *LState) int {
-	L.Push(LNumber(math.Cos(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathCosh(L *LState) int {
-	L.Push(LNumber(math.Cosh(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathDeg(L *LState) int {
-	L.Push(LNumber(float64(L.CheckNumber(1)) * 180 / math.Pi))
-	return 1
-}
-
-func mathExp(L *LState) int {
-	L.Push(LNumber(math.Exp(float64(L.CheckNumber(1)))))
+	L.Push(L.CheckNumber(1))
 	return 1
 }
 
 func mathFloor(L *LState) int {
-	L.Push(LNumber(math.Floor(float64(L.CheckNumber(1)))))
+	L.Push(L.CheckNumber(1))
 	return 1
 }
 
 func mathFmod(L *LState) int {
-	L.Push(LNumber(math.Mod(float64(L.CheckNumber(1)), float64(L.CheckNumber(2)))))
-	return 1
-}
-
-func mathFrexp(L *LState) int {
-	v1, v2 := math.Frexp(float64(L.CheckNumber(1)))
-	L.Push(LNumber(v1))
-	L.Push(LNumber(v2))
-	return 2
-}
-
-func mathLdexp(L *LState) int {
-	L.Push(LNumber(math.Ldexp(float64(L.CheckNumber(1)), L.CheckInt(2))))
-	return 1
-}
-
-func mathLog(L *LState) int {
-	L.Push(LNumber(math.Log(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathLog10(L *LState) int {
-	L.Push(LNumber(math.Log10(float64(L.CheckNumber(1)))))
+	rhs := L.CheckNumber(2)
+	if lNumberIsZero(rhs) {
+		L.RaiseError("attempt to perform 'n%%0'")
+	}
+	L.Push(lNumberMod(L.CheckNumber(1), rhs))
 	return 1
 }
 
@@ -132,7 +49,7 @@ func mathMax(L *LState) int {
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
 		v := L.CheckNumber(i)
-		if v > max {
+		if lNumberCmp(v, max) > 0 {
 			max = v
 		}
 	}
@@ -148,7 +65,7 @@ func mathMin(L *LState) int {
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
 		v := L.CheckNumber(i)
-		if v < min {
+		if lNumberCmp(v, min) < 0 {
 			min = v
 		}
 	}
@@ -157,53 +74,15 @@ func mathMin(L *LState) int {
 }
 
 func mathMod(L *LState) int {
-	lhs := L.CheckNumber(1)
 	rhs := L.CheckNumber(2)
-	L.Push(luaModulo(lhs, rhs))
+	if lNumberIsZero(rhs) {
+		L.RaiseError("attempt to perform 'n%%0'")
+	}
+	L.Push(lNumberMod(L.CheckNumber(1), rhs))
 	return 1
-}
-
-func mathModf(L *LState) int {
-	v1, v2 := math.Modf(float64(L.CheckNumber(1)))
-	L.Push(LNumber(v1))
-	L.Push(LNumber(v2))
-	return 2
 }
 
 func mathPow(L *LState) int {
-	L.Push(LNumber(math.Pow(float64(L.CheckNumber(1)), float64(L.CheckNumber(2)))))
+	L.Push(lNumberPow(L.CheckNumber(1), L.CheckNumber(2)))
 	return 1
 }
-
-func mathRad(L *LState) int {
-	L.Push(LNumber(float64(L.CheckNumber(1)) * math.Pi / 180))
-	return 1
-}
-
-
-func mathSin(L *LState) int {
-	L.Push(LNumber(math.Sin(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathSinh(L *LState) int {
-	L.Push(LNumber(math.Sinh(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathSqrt(L *LState) int {
-	L.Push(LNumber(math.Sqrt(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathTan(L *LState) int {
-	L.Push(LNumber(math.Tan(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-func mathTanh(L *LState) int {
-	L.Push(LNumber(math.Tanh(float64(L.CheckNumber(1)))))
-	return 1
-}
-
-//

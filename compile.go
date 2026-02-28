@@ -2,7 +2,6 @@ package lua
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 
 	"github.com/tos-network/gopher-lua/ast"
@@ -128,13 +127,13 @@ func lnumberValue(expr ast.Expr) (LNumber, bool) {
 	if ex, ok := expr.(*ast.NumberExpr); ok {
 		lv, err := parseNumber(ex.Value)
 		if err != nil {
-			lv = LNumber(math.NaN())
+			return LNumberZero, false
 		}
 		return lv, true
 	} else if ex, ok := expr.(*constLValueExpr); ok {
 		return ex.Value.(LNumber), true
 	}
-	return 0, false
+	return LNumberZero, false
 }
 
 /* utilities }}} */
@@ -1153,7 +1152,7 @@ func compileExpr(context *funcContext, reg int, expr ast.Expr, ec *expcontext) i
 	case *ast.NumberExpr:
 		num, err := parseNumber(ex.Value)
 		if err != nil {
-			num = LNumber(math.NaN())
+			raiseCompileError(context, sline(ex), "invalid uint256 number literal: %s", ex.Value)
 		}
 		code.AddABx(OP_LOADK, sreg, context.ConstIndex(num), sline(ex))
 		return sused
@@ -1274,17 +1273,23 @@ func constFold(exp ast.Expr) ast.Expr { // {{{
 		if lisconst && risconst {
 			switch expr.Operator {
 			case "+":
-				return &constLValueExpr{Value: lvalue + rvalue}
+				return &constLValueExpr{Value: lNumberAdd(lvalue, rvalue)}
 			case "-":
-				return &constLValueExpr{Value: lvalue - rvalue}
+				return &constLValueExpr{Value: lNumberSub(lvalue, rvalue)}
 			case "*":
-				return &constLValueExpr{Value: lvalue * rvalue}
+				return &constLValueExpr{Value: lNumberMul(lvalue, rvalue)}
 			case "/":
-				return &constLValueExpr{Value: lvalue / rvalue}
+				if lNumberIsZero(rvalue) {
+					return expr // division by zero: skip folding, let runtime raise error
+				}
+				return &constLValueExpr{Value: lNumberDiv(lvalue, rvalue)}
 			case "%":
-				return &constLValueExpr{Value: luaModulo(lvalue, rvalue)}
+				if lNumberIsZero(rvalue) {
+					return expr // division by zero: skip folding, let runtime raise error
+				}
+				return &constLValueExpr{Value: lNumberMod(lvalue, rvalue)}
 			case "^":
-				return &constLValueExpr{Value: LNumber(math.Pow(float64(lvalue), float64(rvalue)))}
+				return &constLValueExpr{Value: lNumberPow(lvalue, rvalue)}
 			default:
 				panic(fmt.Sprintf("unknown binop: %v", expr.Operator))
 			}
@@ -1293,9 +1298,6 @@ func constFold(exp ast.Expr) ast.Expr { // {{{
 		}
 	case *ast.UnaryMinusOpExpr:
 		expr.Expr = constFold(expr.Expr)
-		if value, ok := lnumberValue(expr.Expr); ok {
-			return &constLValueExpr{Value: LNumber(-value)}
-		}
 		return expr
 	default:
 

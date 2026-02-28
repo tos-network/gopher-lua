@@ -15,9 +15,9 @@ func TestTableNewLTable(t *testing.T) {
 func TestTableLen(t *testing.T) {
 	tbl := newLTable(0, 0)
 	tbl.RawSetInt(10, LNil)
-	tbl.RawSetInt(9, LNumber(10))
+	tbl.RawSetInt(9, lNumberFromInt(10))
 	tbl.RawSetInt(8, LNil)
-	tbl.RawSetInt(7, LNumber(10))
+	tbl.RawSetInt(7, lNumberFromInt(10))
 	errorIfNotEqual(t, 9, tbl.Len())
 
 	tbl = newLTable(0, 0)
@@ -40,12 +40,10 @@ func TestTableLenType(t *testing.T) {
         v = {}
         v.__index = v
 
-        setmetatable(v, mt)
+	        setmetatable(v, mt)
 
-        assert(#v ~= 0, "#v should return a table reference in this case")
-
-        print(#v)
-    `)
+	        assert(#v ~= 0, "#v should return a table reference in this case")
+	    `)
 	if err != nil {
 		t.Error(err)
 	}
@@ -53,23 +51,23 @@ func TestTableLenType(t *testing.T) {
 
 func TestTableAppend(t *testing.T) {
 	tbl := newLTable(0, 0)
-	tbl.RawSetInt(1, LNumber(1))
-	tbl.RawSetInt(2, LNumber(2))
-	tbl.RawSetInt(3, LNumber(3))
+	tbl.RawSetInt(1, lNumberFromInt(1))
+	tbl.RawSetInt(2, lNumberFromInt(2))
+	tbl.RawSetInt(3, lNumberFromInt(3))
 	errorIfNotEqual(t, 3, tbl.Len())
 
 	tbl.RawSetInt(1, LNil)
 	tbl.RawSetInt(2, LNil)
 	errorIfNotEqual(t, 3, tbl.Len())
 
-	tbl.Append(LNumber(4))
+	tbl.Append(lNumberFromInt(4))
 	errorIfNotEqual(t, 4, tbl.Len())
 
 	tbl.RawSetInt(3, LNil)
 	tbl.RawSetInt(4, LNil)
 	errorIfNotEqual(t, 0, tbl.Len())
 
-	tbl.Append(LNumber(5))
+	tbl.Append(lNumberFromInt(5))
 	errorIfNotEqual(t, 1, tbl.Len())
 }
 
@@ -84,23 +82,23 @@ func TestTableInsert(t *testing.T) {
 	errorIfNotEqual(t, 5, tbl.Len())
 
 	tbl.Insert(-10, LFalse)
-	errorIfNotEqual(t, LFalse, tbl.RawGet(LNumber(-10)))
+	errorIfNotEqual(t, LFalse, tbl.RawGet(LNumberZero))
 	errorIfNotEqual(t, 5, tbl.Len())
 
 	tbl = newLTable(0, 0)
-	tbl.Append(LNumber(1))
-	tbl.Append(LNumber(2))
-	tbl.Append(LNumber(3))
-	tbl.Insert(1, LNumber(10))
-	errorIfNotEqual(t, LNumber(10), tbl.RawGetInt(1))
-	errorIfNotEqual(t, LNumber(1), tbl.RawGetInt(2))
-	errorIfNotEqual(t, LNumber(2), tbl.RawGetInt(3))
-	errorIfNotEqual(t, LNumber(3), tbl.RawGetInt(4))
+	tbl.Append(lNumberFromInt(1))
+	tbl.Append(lNumberFromInt(2))
+	tbl.Append(lNumberFromInt(3))
+	tbl.Insert(1, lNumberFromInt(10))
+	errorIfNotEqual(t, lNumberFromInt(10), tbl.RawGetInt(1))
+	errorIfNotEqual(t, lNumberFromInt(1), tbl.RawGetInt(2))
+	errorIfNotEqual(t, lNumberFromInt(2), tbl.RawGetInt(3))
+	errorIfNotEqual(t, lNumberFromInt(3), tbl.RawGetInt(4))
 	errorIfNotEqual(t, 4, tbl.Len())
 
 	tbl = newLTable(0, 0)
-	tbl.Insert(5, LNumber(10))
-	errorIfNotEqual(t, LNumber(10), tbl.RawGetInt(5))
+	tbl.Insert(5, lNumberFromInt(10))
+	errorIfNotEqual(t, lNumberFromInt(10), tbl.RawGetInt(5))
 
 }
 
@@ -138,7 +136,7 @@ func TestTableRawSetInt(t *testing.T) {
 	tbl := newLTable(0, 0)
 	tbl.RawSetInt(MaxArrayIndex+1, LTrue)
 	errorIfNotEqual(t, 0, tbl.MaxN())
-	errorIfNotEqual(t, LTrue, tbl.RawGet(LNumber(MaxArrayIndex+1)))
+	errorIfNotEqual(t, LTrue, tbl.RawGet(lNumberFromInt(MaxArrayIndex+1)))
 
 	tbl.RawSetInt(1, LTrue)
 	tbl.RawSetInt(3, LTrue)
@@ -167,24 +165,24 @@ func TestTableRawSetH(t *testing.T) {
 
 func TestTableRawGetH(t *testing.T) {
 	tbl := newLTable(0, 0)
-	errorIfNotEqual(t, LNil, tbl.RawGetH(LNumber(1)))
+	errorIfNotEqual(t, LNil, tbl.RawGetH(lNumberFromInt(1)))
 	errorIfNotEqual(t, LNil, tbl.RawGetH(LString("key0")))
 	tbl.RawSetH(LString("key0"), LTrue)
 	tbl.RawSetH(LString("key1"), LFalse)
-	tbl.RawSetH(LNumber(1), LTrue)
+	tbl.RawSetH(lNumberFromInt(1), LTrue)
 	errorIfNotEqual(t, LTrue, tbl.RawGetH(LString("key0")))
-	errorIfNotEqual(t, LTrue, tbl.RawGetH(LNumber(1)))
+	errorIfNotEqual(t, LTrue, tbl.RawGetH(lNumberFromInt(1)))
 	errorIfNotEqual(t, LNil, tbl.RawGetH(LString("notexist")))
 	errorIfNotEqual(t, LNil, tbl.RawGetH(LTrue))
 }
 
 func TestTableForEach(t *testing.T) {
 	tbl := newLTable(0, 0)
-	tbl.Append(LNumber(1))
-	tbl.Append(LNumber(2))
-	tbl.Append(LNumber(3))
+	tbl.Append(lNumberFromInt(1))
+	tbl.Append(lNumberFromInt(2))
+	tbl.Append(lNumberFromInt(3))
 	tbl.Append(LNil)
-	tbl.Append(LNumber(5))
+	tbl.Append(lNumberFromInt(5))
 
 	tbl.RawSetH(LString("a"), LString("a"))
 	tbl.RawSetH(LString("b"), LString("b"))
@@ -205,15 +203,20 @@ func TestTableForEach(t *testing.T) {
 				t.Fail()
 			}
 		case LNumber:
-			switch int(k) {
+			ik, ok := lNumberToInt(k)
+			if !ok {
+				t.Fail()
+				return
+			}
+			switch ik {
 			case 1:
-				errorIfNotEqual(t, LNumber(1), value)
+				errorIfNotEqual(t, lNumberFromInt(1), value)
 			case 2:
-				errorIfNotEqual(t, LNumber(2), value)
+				errorIfNotEqual(t, lNumberFromInt(2), value)
 			case 3:
-				errorIfNotEqual(t, LNumber(3), value)
+				errorIfNotEqual(t, lNumberFromInt(3), value)
 			case 4:
-				errorIfNotEqual(t, LNumber(5), value)
+				errorIfNotEqual(t, lNumberFromInt(5), value)
 			default:
 				t.Fail()
 			}

@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"runtime"
 	"strings"
@@ -1115,7 +1114,7 @@ func (ls *LState) initCallFrame(cf *callFrame) { // +inline-start
 					for i := 0; i < nvarargs; i++ {
 						argtb.RawSetInt(i+1, ls.reg.Get(cf.LocalBase+np+i))
 					}
-					argtb.RawSetString("n", LNumber(nvarargs))
+					argtb.RawSetString("n", lNumberFromInt(nvarargs))
 					//ls.reg.Set(cf.LocalBase+nargs+np, argtb)
 					ls.reg.array[cf.LocalBase+nargs+np] = argtb
 				} else {
@@ -1227,7 +1226,7 @@ func (ls *LState) pushCallFrame(cf callFrame, fn LValue, meta bool) { // +inline
 						for i := 0; i < nvarargs; i++ {
 							argtb.RawSetInt(i+1, ls.reg.Get(cf.LocalBase+np+i))
 						}
-						argtb.RawSetString("n", LNumber(nvarargs))
+						argtb.RawSetString("n", lNumberFromInt(nvarargs))
 						//ls.reg.Set(cf.LocalBase+nargs+np, argtb)
 						ls.reg.array[cf.LocalBase+nargs+np] = argtb
 					} else {
@@ -1415,6 +1414,8 @@ func NewState(opts ...Options) *LState {
 		if opts[0].CallStackSize < 1 {
 			opts[0].CallStackSize = CallStackSize
 		}
+		// Never include host Go stack traces in contract-visible errors.
+		opts[0].IncludeGoStackTrace = false
 		if opts[0].RegistrySize < 128 {
 			opts[0].RegistrySize = RegistrySize
 		}
@@ -1659,11 +1660,16 @@ func (ls *LState) ToBool(n int) bool {
 
 func (ls *LState) ToInt(n int) int {
 	if lv, ok := ls.Get(n).(LNumber); ok {
-		return int(lv)
+		if out, ok := lNumberToInt(lv); ok {
+			return out
+		}
+		return 0
 	}
 	if lv, ok := ls.Get(n).(LString); ok {
 		if num, err := parseNumber(string(lv)); err == nil {
-			return int(num)
+			if out, ok := lNumberToInt(num); ok {
+				return out
+			}
 		}
 	}
 	return 0
@@ -1671,11 +1677,16 @@ func (ls *LState) ToInt(n int) int {
 
 func (ls *LState) ToInt64(n int) int64 {
 	if lv, ok := ls.Get(n).(LNumber); ok {
-		return int64(lv)
+		if out, ok := lNumberToInt64(lv); ok {
+			return out
+		}
+		return 0
 	}
 	if lv, ok := ls.Get(n).(LString); ok {
 		if num, err := parseNumber(string(lv)); err == nil {
-			return int64(num)
+			if out, ok := lNumberToInt64(num); ok {
+				return out
+			}
 		}
 	}
 	return 0
@@ -1913,9 +1924,7 @@ func (ls *LState) GetTable(obj LValue, key LValue) LValue {
 }
 
 func (ls *LState) RawSet(tb *LTable, key LValue, value LValue) {
-	if n, ok := key.(LNumber); ok && math.IsNaN(float64(n)) {
-		ls.RaiseError("table index is NaN")
-	} else if key == LNil {
+	if key == LNil {
 		ls.RaiseError("table index is nil")
 	}
 	tb.RawSet(key, value)
@@ -1964,7 +1973,10 @@ func (ls *LState) ObjLen(v1 LValue) int {
 		ls.Call(1, 1)
 		ret := ls.reg.Pop()
 		if ret.Type() == LTNumber {
-			return int(ret.(LNumber))
+			if out, ok := lNumberToInt(ret.(LNumber)); ok {
+				return out
+			}
+			return 0
 		}
 	} else if v1.Type() == LTTable {
 		return v1.(*LTable).Len()

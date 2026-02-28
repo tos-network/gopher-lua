@@ -3,7 +3,8 @@
 A fork of [gopher-lua](https://github.com/yuin/gopher-lua) hardened for execution
 inside a Byzantine-fault-tolerant blockchain (TOS). Every validator must produce
 **identical results** from identical inputs; the original library's I/O, randomness,
-and channel primitives make that impossible — they are removed here.
+channel primitives, and floating-point arithmetic make that impossible — they are
+removed or replaced here.
 
 Redis has run a sandboxed Lua engine in production for over a decade under exactly
 these constraints. This fork applies the same discipline to a Go blockchain node.
@@ -21,6 +22,9 @@ these constraints. This fork applies the same discipline to a Go blockchain node
 | `math.random` / `math.randomseed` | PRNG seeded from runtime entropy — non-deterministic |
 | `dofile` / `loadfile` | Filesystem execution from Lua scripts |
 | `LState.DoFile` / `LState.LoadFile` | Go-level file loader methods |
+| Float-point arithmetic | `float64` is non-deterministic across CPU/platform; replaced by arbitrary-precision integers |
+| Most `math` functions | Trig, exp, log, pow, sqrt, etc. — all float-based, all removed |
+| `math.pi` / `math.huge` | Float constants — removed |
 
 ## What was kept
 
@@ -29,13 +33,82 @@ these constraints. This fork applies the same discipline to a Go blockchain node
 | `base` | Modified | Removed `dofile`, `loadfile`, `require`, `module`. Kept `collectgarbage` (calls `runtime.GC()` — pure Go, consensus-safe) |
 | `table` | Unchanged | Deterministic |
 | `string` | Unchanged | Deterministic |
-| `math` | Modified | Removed `random`/`randomseed`; all other functions are deterministic |
+| `math` | Heavily trimmed | Only `max`, `min`, `mod` — all integer-safe |
 | `debug` | Unchanged | Stack introspection only, no I/O |
 | `coroutine` | Unchanged | Cooperative scheduling — fully deterministic |
 
 ---
 
-## New: Gas Metering
+## Integer-Only Numbers (`LNumber`)
+
+Lua normally uses `float64` for all numbers. This fork replaces the numeric type
+with **arbitrary-precision integers** backed by `math/big.Int`.
+
+### Why not float64?
+
+`float64` cannot exactly represent wei-denominated balances:
+
+```
+1 TOS = 10¹⁸ wei
+float64 max exact integer ≈ 9 × 10¹⁵  →  loses precision above ~9 TOS
+FPMM invariant product ≈ pool_yes × pool_no  →  can exceed 10³⁶
+```
+
+### Why not uint64?
+
+`uint64` max ≈ 1.8 × 10¹⁹ — only ~18 TOS in wei units, insufficient for realistic
+pool and treasury balances.
+
+### The solution: string-backed big.Int
+
+`LNumber` is now defined as `type LNumber string`. The decimal string is the
+canonical representation; all arithmetic converts to `*big.Int`, operates, and
+converts back:
+
+```lua
+local bal  = tos.balance(tos.caller())   -- "1000000000000000000" (1 TOS in wei)
+local half = bal / 2                     -- "500000000000000000"
+local fee  = bal * 3 / 1000             -- "3000000000000000"
+```
+
+### Arithmetic rules
+
+| Operation | Behaviour |
+|-----------|-----------|
+| `+` `-` `*` | Exact big integer arithmetic — no overflow |
+| `/` | Integer division, truncates toward zero (`7/2 == 3`) |
+| `%` | Integer modulo, sign follows divisor |
+| `^` | **Removed** — raises a runtime error |
+| Negative numbers | Supported (`-1`, `-n`) |
+| Float literals | **Rejected** at parse time (`3.14`, `1e5` are syntax errors) |
+
+### Math library (trimmed)
+
+Only three functions remain in `math`:
+
+| Function | Description |
+|----------|-------------|
+| `math.max(a, b, ...)` | Largest argument |
+| `math.min(a, b, ...)` | Smallest argument |
+| `math.mod(a, b)` | Same as `a % b` |
+
+All trigonometric, exponential, logarithmic, and rounding functions are removed.
+The constants `math.pi` and `math.huge` are removed.
+
+### `tonumber` behaviour
+
+`tonumber` accepts only integer strings. Float strings are rejected:
+
+```lua
+tonumber("42")    -- 42
+tonumber("0xff")  -- 255
+tonumber("3.14")  -- nil  (rejected)
+tonumber("1e5")   -- nil  (rejected)
+```
+
+---
+
+## Gas Metering
 
 Every blockchain transaction has a gas budget. Scripts that loop forever must be
 killed before they stall a validator. Gas metering counts VM instructions and
@@ -104,10 +177,13 @@ A Lua contract calling these primitives looks like:
 
 ```lua
 local bal = tos.balance(tos.caller())
-tos.require(tonumber(bal) >= 1000, "insufficient balance")
+local min_bal = 1000000000000000000   -- 1 TOS in wei
+tos.require(bal >= min_bal, "insufficient balance")
 tos.set("initialized", "1")
 tos.transfer("0x...", "500000000000000000")
 ```
+
+Note: all balance comparisons are exact integer comparisons — no float rounding.
 
 ---
 
@@ -146,6 +222,17 @@ func myFunc(L *lua.LState) int {
 L.SetGlobal("myFunc", L.NewFunction(myFunc))
 ```
 
+To push a numeric result, use `lua.LNumber`:
+
+```go
+func tosBalance(L *lua.LState) int {
+    addr := L.CheckString(1)
+    wei := getBalanceWei(addr)          // returns *big.Int
+    L.Push(lua.LNumber(wei.String()))   // push as decimal string
+    return 1
+}
+```
+
 ---
 
 ## Context / Timeout
@@ -170,12 +257,26 @@ err := L.DoString(src)
 |----------|---------|-------|
 | `nil` | `lua.LNil` | constant |
 | `bool` | `lua.LBool` | `lua.LTrue`, `lua.LFalse` |
-| `number` | `lua.LNumber` | `float64` |
+| `number` | `lua.LNumber` | `string` containing a decimal integer; backed by `math/big.Int` |
 | `string` | `lua.LString` | `string` |
 | `table` | `*lua.LTable` | |
 | `function` | `*lua.LFunction` | |
 | `userdata` | `*lua.LUserData` | for Go-defined types |
 | `thread` | `*lua.LState` | coroutines |
+
+### Constructing LNumber from Go
+
+```go
+// From an int
+lua.LNumber("42")
+
+// From a *big.Int
+lua.LNumber(bigIntValue.String())
+
+// From a wei amount
+wei := new(big.Int).Mul(big.NewInt(5), params.TOS)  // 5 TOS in wei
+lua.LNumber(wei.String())
+```
 
 ---
 
@@ -201,7 +302,7 @@ A minimal REPL / script runner for local testing (not for on-chain use):
 ```bash
 go build ./cmd/glua
 ./glua script.lua
-./glua -e 'print("hello")'
+./glua -e 'print(1000000000000000000 + 1)'
 ```
 
 ---

@@ -93,7 +93,7 @@ func (tb *LTable) Insert(i int, value LValue) {
 		return
 	}
 	if i <= 0 {
-		tb.RawSet(LNumber(i), value)
+		tb.RawSet(lNumberFromInt(i), value)
 		return
 	}
 	i -= 1
@@ -151,7 +151,12 @@ func (tb *LTable) RawSet(key LValue, value LValue) {
 			if tb.array == nil {
 				tb.array = make([]LValue, 0, defaultArrayCap)
 			}
-			index := int(v) - 1
+			intv, ok := lNumberToInt(v)
+			if !ok {
+				tb.RawSetH(key, value)
+				return
+			}
+			index := intv - 1
 			alen := len(tb.array)
 			switch {
 			case index == alen:
@@ -177,7 +182,7 @@ func (tb *LTable) RawSet(key LValue, value LValue) {
 // RawSetInt sets a given LValue at a position `key` without the __newindex metamethod.
 func (tb *LTable) RawSetInt(key int, value LValue) {
 	if key < 1 || key >= MaxArrayIndex {
-		tb.RawSetH(LNumber(key), value)
+		tb.RawSetH(lNumberFromInt(key), value)
 		return
 	}
 	if tb.array == nil {
@@ -255,7 +260,11 @@ func (tb *LTable) RawGet(key LValue) LValue {
 			if tb.array == nil {
 				return LNil
 			}
-			index := int(v) - 1
+			intv, ok := lNumberToInt(v)
+			if !ok {
+				return LNil
+			}
+			index := intv - 1
 			if index >= len(tb.array) {
 				return LNil
 			}
@@ -327,22 +336,15 @@ func (tb *LTable) ForEach(cb func(LValue, LValue)) {
 	if tb.array != nil {
 		for i, v := range tb.array {
 			if v != LNil {
-				cb(LNumber(i+1), v)
+				cb(lNumberFromInt(i+1), v)
 			}
 		}
 	}
-	if tb.strdict != nil {
-		for k, v := range tb.strdict {
-			if v != LNil {
-				cb(LString(k), v)
-			}
-		}
-	}
-	if tb.dict != nil {
-		for k, v := range tb.dict {
-			if v != LNil {
-				cb(k, v)
-			}
+
+	// Keep hash-part traversal deterministic: iterate insertion-order keys.
+	for _, key := range tb.keys {
+		if v := tb.RawGetH(key); v != LNil {
+			cb(key, v)
 		}
 	}
 }
@@ -351,27 +353,28 @@ func (tb *LTable) ForEach(cb func(LValue, LValue)) {
 func (tb *LTable) Next(key LValue) (LValue, LValue) {
 	init := false
 	if key == LNil {
-		key = LNumber(0)
+		key = LNumberZero
 		init = true
 	}
 
-	if init || key != LNumber(0) {
-		if kv, ok := key.(LNumber); ok && isInteger(kv) && int(kv) >= 0 && kv < LNumber(MaxArrayIndex) {
-			index := int(kv)
-			if tb.array != nil {
-				for ; index < len(tb.array); index++ {
-					if v := tb.array[index]; v != LNil {
-						return LNumber(index + 1), v
+	if init || key != LNumberZero {
+		if kv, ok := key.(LNumber); ok {
+			if index, ok := lNumberToInt(kv); ok && index >= 0 && index < MaxArrayIndex {
+				if tb.array != nil {
+					for ; index < len(tb.array); index++ {
+						if v := tb.array[index]; v != LNil {
+							return lNumberFromInt(index + 1), v
+						}
 					}
 				}
-			}
-			if tb.array == nil || index == len(tb.array) {
-				if (tb.dict == nil || len(tb.dict) == 0) && (tb.strdict == nil || len(tb.strdict) == 0) {
-					return LNil, LNil
-				}
-				key = tb.keys[0]
-				if v := tb.RawGetH(key); v != LNil {
-					return key, v
+				if tb.array == nil || index == len(tb.array) {
+					if (tb.dict == nil || len(tb.dict) == 0) && (tb.strdict == nil || len(tb.strdict) == 0) {
+						return LNil, LNil
+					}
+					key = tb.keys[0]
+					if v := tb.RawGetH(key); v != LNil {
+						return key, v
+					}
 				}
 			}
 		}

@@ -8,7 +8,7 @@ func TestCheckInt(t *testing.T) {
 	L := NewState()
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		errorIfNotEqual(t, 10, L.CheckInt(2))
 		L.Push(LString("aaa"))
 		L.CheckInt(3)
@@ -20,7 +20,7 @@ func TestCheckInt64(t *testing.T) {
 	L := NewState()
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		errorIfNotEqual(t, int64(10), L.CheckInt64(2))
 		L.Push(LString("aaa"))
 		L.CheckInt64(3)
@@ -32,10 +32,10 @@ func TestCheckNumber(t *testing.T) {
 	L := NewState()
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
-		L.Push(LNumber(10))
-		errorIfNotEqual(t, LNumber(10), L.CheckNumber(2))
+		L.Push(lNumberFromInt(10))
+		errorIfNotEqual(t, lNumberFromInt(10), L.CheckNumber(2))
 		L.Push(LString("11"))
-		errorIfNotEqual(t, LNumber(11), L.CheckNumber(3))
+		errorIfNotEqual(t, lNumberFromInt(11), L.CheckNumber(3))
 		L.Push(LString("aaa"))
 		L.CheckNumber(4)
 		return 0
@@ -48,7 +48,7 @@ func TestCheckString(t *testing.T) {
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
 		L.Push(LString("aaa"))
 		errorIfNotEqual(t, "aaa", L.CheckString(2))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		errorIfNotEqual(t, "10", L.CheckString(3))
 		L.Push(L.NewTable())
 		L.CheckString(4)
@@ -62,7 +62,7 @@ func TestCheckBool(t *testing.T) {
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
 		L.Push(LTrue)
 		errorIfNotEqual(t, true, L.CheckBool(2))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckBool(3)
 		return 0
 	}, "boolean expected, got number")
@@ -75,7 +75,7 @@ func TestCheckTable(t *testing.T) {
 		tbl := L.NewTable()
 		L.Push(tbl)
 		errorIfNotEqual(t, tbl, L.CheckTable(2))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckTable(3)
 		return 0
 	}, "table expected, got number")
@@ -88,7 +88,7 @@ func TestCheckFunction(t *testing.T) {
 		fn := L.NewFunction(func(l *LState) int { return 0 })
 		L.Push(fn)
 		errorIfNotEqual(t, fn, L.CheckFunction(2))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckFunction(3)
 		return 0
 	}, "function expected, got number")
@@ -101,7 +101,7 @@ func TestCheckUserData(t *testing.T) {
 		ud := L.NewUserData()
 		L.Push(ud)
 		errorIfNotEqual(t, ud, L.CheckUserData(2))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckUserData(3)
 		return 0
 	}, "userdata expected, got number")
@@ -114,7 +114,7 @@ func TestCheckThread(t *testing.T) {
 		th, _ := L.NewThread()
 		L.Push(th)
 		errorIfNotEqual(t, th, L.CheckThread(2))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckThread(3)
 		return 0
 	}, "thread expected, got number")
@@ -137,7 +137,7 @@ func TestCheckType(t *testing.T) {
 	L := NewState()
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckType(2, LTNumber)
 		L.CheckType(2, LTString)
 		return 0
@@ -148,7 +148,7 @@ func TestCheckTypes(t *testing.T) {
 	L := NewState()
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.CheckTypes(2, LTString, LTBool, LTNumber)
 		L.CheckTypes(2, LTString, LTBool)
 		return 0
@@ -177,7 +177,7 @@ func TestOptInt(t *testing.T) {
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
 		errorIfNotEqual(t, 99, L.OptInt(1, 99))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		errorIfNotEqual(t, 10, L.OptInt(2, 99))
 		L.Push(LString("aaa"))
 		L.OptInt(3, 99)
@@ -190,7 +190,7 @@ func TestOptInt64(t *testing.T) {
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
 		errorIfNotEqual(t, int64(99), L.OptInt64(1, int64(99)))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		errorIfNotEqual(t, int64(10), L.OptInt64(2, int64(99)))
 		L.Push(LString("aaa"))
 		L.OptInt64(3, int64(99))
@@ -202,11 +202,11 @@ func TestOptNumber(t *testing.T) {
 	L := NewState()
 	defer L.Close()
 	errorIfGFuncNotFail(t, L, func(L *LState) int {
-		errorIfNotEqual(t, LNumber(99), L.OptNumber(1, LNumber(99)))
-		L.Push(LNumber(10))
-		errorIfNotEqual(t, LNumber(10), L.OptNumber(2, LNumber(99)))
+		errorIfNotEqual(t, lNumberFromInt(99), L.OptNumber(1, lNumberFromInt(99)))
+		L.Push(lNumberFromInt(10))
+		errorIfNotEqual(t, lNumberFromInt(10), L.OptNumber(2, lNumberFromInt(99)))
 		L.Push(LString("aaa"))
-		L.OptNumber(3, LNumber(99))
+		L.OptNumber(3, lNumberFromInt(99))
 		return 0
 	}, "number expected, got string")
 }
@@ -218,7 +218,7 @@ func TestOptString(t *testing.T) {
 		errorIfNotEqual(t, "bbb", L.OptString(1, "bbb"))
 		L.Push(LString("aaa"))
 		errorIfNotEqual(t, "aaa", L.OptString(2, "bbb"))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.OptString(3, "bbb")
 		return 0
 	}, "string expected, got number")
@@ -231,7 +231,7 @@ func TestOptBool(t *testing.T) {
 		errorIfNotEqual(t, true, L.OptBool(1, true))
 		L.Push(LTrue)
 		errorIfNotEqual(t, true, L.OptBool(2, false))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.OptBool(3, false)
 		return 0
 	}, "boolean expected, got number")
@@ -246,7 +246,7 @@ func TestOptTable(t *testing.T) {
 		tbl := L.NewTable()
 		L.Push(tbl)
 		errorIfNotEqual(t, tbl, L.OptTable(2, deftbl))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.OptTable(3, deftbl)
 		return 0
 	}, "table expected, got number")
@@ -261,7 +261,7 @@ func TestOptFunction(t *testing.T) {
 		fn := L.NewFunction(func(l *LState) int { return 0 })
 		L.Push(fn)
 		errorIfNotEqual(t, fn, L.OptFunction(2, deffn))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.OptFunction(3, deffn)
 		return 0
 	}, "function expected, got number")
@@ -276,7 +276,7 @@ func TestOptUserData(t *testing.T) {
 		ud := L.NewUserData()
 		L.Push(ud)
 		errorIfNotEqual(t, ud, L.OptUserData(2, defud))
-		L.Push(LNumber(10))
+		L.Push(lNumberFromInt(10))
 		L.OptUserData(3, defud)
 		return 0
 	}, "userdata expected, got number")
@@ -296,4 +296,3 @@ func TestOptChannel(t *testing.T) {
 		return 0
 	}, "channel expected, got string")
 }
-

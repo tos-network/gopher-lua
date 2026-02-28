@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"strconv"
+
 	"github.com/chzyer/readline"
 	"github.com/tos-network/gopher-lua"
 	"github.com/tos-network/gopher-lua/parse"
@@ -77,7 +79,7 @@ Available options are:
 		script := flag.Arg(0)
 		argtb := L.NewTable()
 		for i := 1; i < nargs; i++ {
-			L.RawSet(argtb, lua.LNumber(i), lua.LString(flag.Arg(i)))
+			L.RawSet(argtb, lua.LNumber(strconv.Itoa(i)), lua.LString(flag.Arg(i)))
 		}
 		L.SetGlobal("arg", argtb)
 		if opt_dt || opt_dc {

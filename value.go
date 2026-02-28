@@ -3,6 +3,7 @@ package lua
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 )
 
@@ -59,6 +60,21 @@ func LVCanConvToString(v LValue) bool {
 	}
 }
 
+// lnumToBig parses an LNumber string into a *big.Int.
+// Returns big.NewInt(0) for invalid inputs.
+func lnumToBig(n LNumber) *big.Int {
+	z := new(big.Int)
+	if s := string(n); s != "" {
+		z.SetString(s, 10)
+	}
+	return z
+}
+
+// bigToLNum converts a *big.Int to LNumber (decimal string).
+func bigToLNum(b *big.Int) LNumber {
+	return LNumber(b.String())
+}
+
 // LVAsNumber tries to convert a given LValue to a number.
 func LVAsNumber(v LValue) LNumber {
 	switch lv := v.(type) {
@@ -69,7 +85,7 @@ func LVAsNumber(v LValue) LNumber {
 			return num
 		}
 	}
-	return LNumber(0)
+	return LNumber("0")
 }
 
 type LNilType struct{}
@@ -111,32 +127,23 @@ func (st LString) Format(f fmt.State, c rune) {
 	}
 }
 
-func (nm LNumber) String() string {
-	if isInteger(nm) {
-		return fmt.Sprint(int64(nm))
-	}
-	return fmt.Sprint(float64(nm))
-}
-
+func (nm LNumber) String() string   { return string(nm) }
 func (nm LNumber) Type() LValueType { return LTNumber }
 
 // fmt.Formatter interface
 func (nm LNumber) Format(f fmt.State, c rune) {
+	b := lnumToBig(nm)
 	switch c {
 	case 'q', 's':
 		defaultFormat(nm.String(), f, c)
 	case 'b', 'c', 'd', 'o', 'x', 'X', 'U':
-		defaultFormat(int64(nm), f, c)
-	case 'e', 'E', 'f', 'F', 'g', 'G':
-		defaultFormat(float64(nm), f, c)
+		defaultFormat(b.Int64(), f, c)
 	case 'i':
-		defaultFormat(int64(nm), f, 'd')
+		defaultFormat(b.Int64(), f, 'd')
+	case 'e', 'E', 'f', 'F', 'g', 'G':
+		defaultFormat(nm.String(), f, 's')
 	default:
-		if isInteger(nm) {
-			defaultFormat(int64(nm), f, c)
-		} else {
-			defaultFormat(float64(nm), f, c)
-		}
+		defaultFormat(nm.String(), f, c)
 	}
 }
 
@@ -150,7 +157,7 @@ type LTable struct {
 	k2i     map[LValue]int
 }
 
-func (tb *LTable) String() string   { return fmt.Sprintf("table: %p", tb) }
+func (tb *LTable) String() string   { return "table" }
 func (tb *LTable) Type() LValueType { return LTTable }
 
 type LFunction struct {
@@ -162,7 +169,7 @@ type LFunction struct {
 }
 type LGFunction func(*LState) int
 
-func (fn *LFunction) String() string   { return fmt.Sprintf("function: %p", fn) }
+func (fn *LFunction) String() string   { return "function" }
 func (fn *LFunction) Type() LValueType { return LTFunction }
 
 type Global struct {
@@ -211,7 +218,7 @@ func (ls *LState) SetGasLimit(limit uint64) {
 // GasUsed returns the number of VM instructions executed so far.
 func (ls *LState) GasUsed() uint64 { return ls.gasUsed }
 
-func (ls *LState) String() string   { return fmt.Sprintf("thread: %p", ls) }
+func (ls *LState) String() string   { return "thread" }
 func (ls *LState) Type() LValueType { return LTThread }
 
 type LUserData struct {
@@ -220,10 +227,10 @@ type LUserData struct {
 	Metatable LValue
 }
 
-func (ud *LUserData) String() string   { return fmt.Sprintf("userdata: %p", ud) }
+func (ud *LUserData) String() string   { return "userdata" }
 func (ud *LUserData) Type() LValueType { return LTUserData }
 
 type LChannel chan LValue
 
-func (ch LChannel) String() string   { return fmt.Sprintf("channel: %p", ch) }
+func (ch LChannel) String() string   { return "channel" }
 func (ch LChannel) Type() LValueType { return LTChannel }

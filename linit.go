@@ -33,8 +33,8 @@ var luaLibs = []luaLib{
 	luaLib{TabLibName, OpenTable},
 	luaLib{StringLibName, OpenString},
 	luaLib{MathLibName, OpenMath},
-	luaLib{DebugLibName, OpenDebug},
-	luaLib{CoroutineLibName, OpenCoroutine},
+	// DebugLibName/OpenDebug    REMOVED: setlocal/setupvalue break all abstraction
+	// CoroutineLibName/OpenCoroutine REMOVED: no EVM analog, non-deterministic complexity
 }
 
 // OpenLibs loads the built-in libraries. It is equivalent to running OpenLoad,

@@ -32,7 +32,6 @@ func TestCallStackOverflowWhenFixed(t *testing.T) {
       end
     end
     local function c()
-      print(_printregs())
       recurse(9)
     end
     c()
@@ -59,7 +58,6 @@ func TestCallStackOverflowWhenAutoGrow(t *testing.T) {
       end
     end
     local function c()
-      print(_printregs())
       recurse(9)
     end
     c()
@@ -69,11 +67,12 @@ func TestCallStackOverflowWhenAutoGrow(t *testing.T) {
 func TestSkipOpenLibs(t *testing.T) {
 	L := NewState(Options{SkipOpenLibs: true})
 	defer L.Close()
-	errorIfScriptNotFail(t, L, `print("")`,
+	// type() is only available when base lib is loaded
+	errorIfScriptNotFail(t, L, `type("")`,
 		"attempt to call a non-function object")
 	L2 := NewState()
 	defer L2.Close()
-	errorIfScriptFail(t, L2, `print("")`)
+	errorIfScriptFail(t, L2, `type("")`)
 }
 
 func TestGetAndReplace(t *testing.T) {
@@ -121,10 +120,10 @@ func TestGetAndReplace(t *testing.T) {
 	L2 := NewState()
 	defer L2.Close()
 	clo := L2.NewClosure(func(L2 *LState) int {
-		L2.Replace(UpvalueIndex(1), LNumber(3))
-		errorIfNotEqual(t, LNumber(3), L2.Get(UpvalueIndex(1)))
+		L2.Replace(UpvalueIndex(1), lNumberFromInt(3))
+		errorIfNotEqual(t, lNumberFromInt(3), L2.Get(UpvalueIndex(1)))
 		return 0
-	}, LNumber(1), LNumber(2))
+	}, lNumberFromInt(1), lNumberFromInt(2))
 	L2.SetGlobal("clo", clo)
 	errorIfScriptFail(t, L2, `clo()`)
 }
@@ -165,40 +164,40 @@ func TestRemove(t *testing.T) {
 func TestToInt(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewTable())
 	errorIfNotEqual(t, 10, L.ToInt(1))
-	errorIfNotEqual(t, 99, L.ToInt(2))
+	errorIfNotEqual(t, 0, L.ToInt(2))
 	errorIfNotEqual(t, 0, L.ToInt(3))
 }
 
 func TestToInt64(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewTable())
 	errorIfNotEqual(t, int64(10), L.ToInt64(1))
-	errorIfNotEqual(t, int64(99), L.ToInt64(2))
+	errorIfNotEqual(t, int64(0), L.ToInt64(2))
 	errorIfNotEqual(t, int64(0), L.ToInt64(3))
 }
 
 func TestToNumber(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewTable())
-	errorIfNotEqual(t, LNumber(10), L.ToNumber(1))
-	errorIfNotEqual(t, LNumber(99.9), L.ToNumber(2))
-	errorIfNotEqual(t, LNumber(0), L.ToNumber(3))
+	errorIfNotEqual(t, lNumberFromInt(10), L.ToNumber(1))
+	errorIfNotEqual(t, LNumberZero, L.ToNumber(2))
+	errorIfNotEqual(t, LNumberZero, L.ToNumber(3))
 }
 
 func TestToString(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewTable())
 	errorIfNotEqual(t, "10", L.ToString(1))
@@ -209,7 +208,7 @@ func TestToString(t *testing.T) {
 func TestToTable(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewTable())
 	errorIfFalse(t, L.ToTable(1) == nil, "index 1 must be nil")
@@ -220,7 +219,7 @@ func TestToTable(t *testing.T) {
 func TestToFunction(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewFunction(func(L *LState) int { return 0 }))
 	errorIfFalse(t, L.ToFunction(1) == nil, "index 1 must be nil")
@@ -231,7 +230,7 @@ func TestToFunction(t *testing.T) {
 func TestToUserData(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	L.Push(L.NewUserData())
 	errorIfFalse(t, L.ToUserData(1) == nil, "index 1 must be nil")
@@ -242,7 +241,7 @@ func TestToUserData(t *testing.T) {
 func TestToChannel(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	L.Push(LNumber(10))
+	L.Push(lNumberFromInt(10))
 	L.Push(LString("99.9"))
 	var ch chan LValue
 	L.Push(LChannel(ch))
@@ -262,18 +261,18 @@ func TestObjLen(t *testing.T) {
 	mt := L.NewTable()
 	L.SetField(mt, "__len", L.NewFunction(func(L *LState) int {
 		tbl := L.CheckTable(1)
-		L.Push(LNumber(tbl.Len() + 1))
+		L.Push(lNumberFromInt(tbl.Len() + 1))
 		return 1
 	}))
 	L.SetMetatable(tbl, mt)
 	errorIfNotEqual(t, 3, L.ObjLen(tbl))
-	errorIfNotEqual(t, 0, L.ObjLen(LNumber(10)))
+	errorIfNotEqual(t, 0, L.ObjLen(lNumberFromInt(10)))
 }
 
 func TestConcat(t *testing.T) {
 	L := NewState()
 	defer L.Close()
-	errorIfNotEqual(t, "a1c", L.Concat(LString("a"), LNumber(1), LString("c")))
+	errorIfNotEqual(t, "a1c", L.Concat(LString("a"), lNumberFromInt(1), LString("c")))
 }
 
 func TestPCall(t *testing.T) {
@@ -327,6 +326,7 @@ func TestPCall(t *testing.T) {
 }
 
 func TestCoroutineApi1(t *testing.T) {
+	t.Skip("coroutine library removed")
 	L := NewState()
 	defer L.Close()
 	co, _ := L.NewThread()
@@ -341,25 +341,25 @@ func TestCoroutineApi1(t *testing.T) {
       end
     `)
 	fn := L.GetGlobal("coro").(*LFunction)
-	st, err, values := L.Resume(co, fn, LNumber(10))
+	st, err, values := L.Resume(co, fn, lNumberFromInt(10))
 	errorIfNotEqual(t, ResumeYield, st)
 	errorIfNotNil(t, err)
 	errorIfNotEqual(t, 3, len(values))
-	errorIfNotEqual(t, LNumber(1), values[0].(LNumber))
-	errorIfNotEqual(t, LNumber(2), values[1].(LNumber))
-	errorIfNotEqual(t, LNumber(3), values[2].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(1), values[0].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(2), values[1].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(3), values[2].(LNumber))
 
-	st, err, values = L.Resume(co, fn, LNumber(11), LNumber(12))
+	st, err, values = L.Resume(co, fn, lNumberFromInt(11), lNumberFromInt(12))
 	errorIfNotEqual(t, ResumeYield, st)
 	errorIfNotNil(t, err)
 	errorIfNotEqual(t, 1, len(values))
-	errorIfNotEqual(t, LNumber(4), values[0].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(4), values[0].(LNumber))
 
 	st, err, values = L.Resume(co, fn)
 	errorIfNotEqual(t, ResumeOK, st)
 	errorIfNotNil(t, err)
 	errorIfNotEqual(t, 1, len(values))
-	errorIfNotEqual(t, LNumber(5), values[0].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(5), values[0].(LNumber))
 
 	L.Register("myyield", func(L *LState) int {
 		return L.Yield(L.ToNumber(1))
@@ -377,15 +377,15 @@ func TestCoroutineApi1(t *testing.T) {
 	errorIfNotEqual(t, ResumeYield, st)
 	errorIfNotNil(t, err)
 	errorIfNotEqual(t, 3, len(values))
-	errorIfNotEqual(t, LNumber(1), values[0].(LNumber))
-	errorIfNotEqual(t, LNumber(2), values[1].(LNumber))
-	errorIfNotEqual(t, LNumber(3), values[2].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(1), values[0].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(2), values[1].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(3), values[2].(LNumber))
 
 	st, err, values = L.Resume(co, fn)
 	errorIfNotEqual(t, ResumeYield, st)
 	errorIfNotNil(t, err)
 	errorIfNotEqual(t, 1, len(values))
-	errorIfNotEqual(t, LNumber(4), values[0].(LNumber))
+	errorIfNotEqual(t, lNumberFromInt(4), values[0].(LNumber))
 
 	st, err, values = L.Resume(co, fn)
 	errorIfNotEqual(t, ResumeError, st)
@@ -443,6 +443,7 @@ func TestContextCancel(t *testing.T) {
 }
 
 func TestContextWithCroutine(t *testing.T) {
+	t.Skip("coroutine library removed")
 	L := NewState()
 	defer L.Close()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -463,7 +464,7 @@ func TestContextWithCroutine(t *testing.T) {
 	fn := L.GetGlobal("coro").(*LFunction)
 	_, err, values := L.Resume(co, fn)
 	errorIfNotNil(t, err)
-	errorIfNotEqual(t, LNumber(0), values[0])
+	errorIfNotEqual(t, lNumberFromInt(0), values[0])
 	// cancel the parent context
 	cancel()
 	_, err, values = L.Resume(co, fn)

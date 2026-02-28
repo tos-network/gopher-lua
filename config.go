@@ -12,11 +12,13 @@ var CallStackSize = 256
 var MaxTableGetLoop = 100
 var MaxArrayIndex = 67108864
 
-type LNumber float64
+type LNumber string
 
-const LNumberBit = 64
-const LNumberScanFormat = "%f"
-const LuaVersion = "Lua 5.1"
+const LNumberBit = 256
+const LNumberScanFormat = "%d"
+const LNumberZero LNumber = "0"
+const LNumberOne LNumber = "1"
+const LuaVersion = "Lua 5.1 (uint256)"
 
 var LuaPath = "LUA_PATH"
 var LuaLDir string

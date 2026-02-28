@@ -15,31 +15,31 @@ import (
 const maxMemory = 40
 
 var gluaTests []string = []string{
-	// "base.lua",   -- uses dofile (removed)
-	"coroutine.lua",
-	"db.lua",
-	// "issues.lua", -- uses math.random (removed)
-	// "os.lua",     -- uses os lib (removed)
+	// "base.lua",      -- uses dofile (removed)
+	// "coroutine.lua", -- coroutine lib removed
+	// "db.lua",        -- debug lib removed
+	// "issues.lua",    -- uses math.random (removed)
+	// "os.lua",        -- uses os lib (removed)
 	"table.lua",
-	"vm.lua",
-	"math.lua",
-	"strings.lua",
-	"goto.lua",
+	// "vm.lua",     -- uses loadstring (removed)
+	// "math.lua",   -- uses float literals and removed functions (fmod, pow)
+	// "strings.lua", -- expects string.dump to exist
+	// "goto.lua",    -- uses loadstring (removed)
 }
 
 var luaTests []string = []string{
 	// "attrib.lua",    -- uses require (removed)
 	// "calls.lua",     -- uses require (removed)
-	"closure.lua",
-	"constructs.lua",
+	// "closure.lua",   -- uses float literals (1.345 etc.)
+	// "constructs.lua", -- uses float literals (1.25 etc.)
 	// "events.lua",    -- uses collectgarbage/os
 	// "literals.lua",  -- uses os.setlocale (removed)
-	"locals.lua",
+	// "locals.lua", -- uses print/loadstring (removed)
 	// "math.lua",      -- uses io.tmpfile (removed)
 	// "sort.lua",      -- uses require (removed)
 	// "strings.lua",   -- uses os.setlocale (removed)
-	"vararg.lua",
-	"pm.lua",
+	// "vararg.lua", -- uses float literals
+	// "pm.lua", -- uses print
 	// "files.lua",     -- uses io (removed)
 }
 
@@ -110,13 +110,14 @@ func sleep(L *LState) int {
 }
 
 func countFinalizers(L *LState) int {
-	L.Push(LNumber(numActiveUserDatas))
+	L.Push(lNumberFromInt(int(numActiveUserDatas)))
 	return 1
 }
 
 // TestLocalVarFree verifies that tables and user user datas which are no longer referenced by the lua script are
 // correctly gc-ed. There was a bug in gopher lua where local vars were not being gc-ed in all circumstances.
 func TestLocalVarFree(t *testing.T) {
+	t.Skip("collectgarbage removed for deterministic VM")
 	s := `
 		function Test(a, b, c)
 			local a = { v = allocFinalizer() }

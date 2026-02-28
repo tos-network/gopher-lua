@@ -131,28 +131,17 @@ func strftime(t time.Time, cfmt string) string {
 }
 
 func isInteger(v LNumber) bool {
-	return float64(v) == float64(int64(v))
-	//_, frac := math.Modf(float64(v))
-	//return frac == 0.0
+	_, err := parseUint256(string(v))
+	return err == nil
 }
 
 func isArrayKey(v LNumber) bool {
-	return isInteger(v) && v < LNumber(int((^uint(0))>>1)) && v > LNumber(0) && v < LNumber(MaxArrayIndex)
+	idx, ok := lNumberToInt(v)
+	return ok && idx > 0 && idx < MaxArrayIndex
 }
 
 func parseNumber(number string) (LNumber, error) {
-	var value LNumber
-	number = strings.Trim(number, " \t\n")
-	if v, err := strconv.ParseInt(number, 0, LNumberBit); err != nil {
-		if v2, err2 := strconv.ParseFloat(number, LNumberBit); err2 != nil {
-			return LNumber(0), err2
-		} else {
-			value = LNumber(v2)
-		}
-	} else {
-		value = LNumber(v)
-	}
-	return value, nil
+	return parseUint256(number)
 }
 
 func popenArgs(arg string) (string, []string) {

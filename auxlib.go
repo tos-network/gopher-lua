@@ -2,6 +2,7 @@ package lua
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -17,7 +18,10 @@ func (ls *LState) CheckAny(n int) LValue {
 func (ls *LState) CheckInt(n int) int {
 	v := ls.Get(n)
 	if intv, ok := v.(LNumber); ok {
-		return int(intv)
+		if out, ok := lNumberToInt(intv); ok {
+			return out
+		}
+		ls.ArgError(n, "number out of range")
 	}
 	ls.TypeError(n, LTNumber)
 	return 0
@@ -26,7 +30,10 @@ func (ls *LState) CheckInt(n int) int {
 func (ls *LState) CheckInt64(n int) int64 {
 	v := ls.Get(n)
 	if intv, ok := v.(LNumber); ok {
-		return int64(intv)
+		if out, ok := lNumberToInt64(intv); ok {
+			return out
+		}
+		ls.ArgError(n, "number out of range")
 	}
 	ls.TypeError(n, LTNumber)
 	return 0
@@ -43,7 +50,7 @@ func (ls *LState) CheckNumber(n int) LNumber {
 		}
 	}
 	ls.TypeError(n, LTNumber)
-	return 0
+	return LNumberZero
 }
 
 func (ls *LState) CheckString(n int) string {
@@ -144,7 +151,10 @@ func (ls *LState) OptInt(n int, d int) int {
 		return d
 	}
 	if intv, ok := v.(LNumber); ok {
-		return int(intv)
+		if out, ok := lNumberToInt(intv); ok {
+			return out
+		}
+		ls.ArgError(n, "number out of range")
 	}
 	ls.TypeError(n, LTNumber)
 	return 0
@@ -156,7 +166,10 @@ func (ls *LState) OptInt64(n int, d int64) int64 {
 		return d
 	}
 	if intv, ok := v.(LNumber); ok {
-		return int64(intv)
+		if out, ok := lNumberToInt64(intv); ok {
+			return out
+		}
+		ls.ArgError(n, "number out of range")
 	}
 	ls.TypeError(n, LTNumber)
 	return 0
@@ -171,7 +184,7 @@ func (ls *LState) OptNumber(n int, d LNumber) LNumber {
 		return lv
 	}
 	ls.TypeError(n, LTNumber)
-	return 0
+	return LNumberZero
 }
 
 func (ls *LState) OptString(n int, d string) string {
@@ -291,7 +304,8 @@ func (ls *LState) RegisterModule(name string, funcs map[string]LGFunction) LValu
 		if newmodtb, ok := newmod.(*LTable); !ok {
 			ls.RaiseError("name conflict for module(%v)", name)
 		} else {
-			for fname, fn := range funcs {
+			for _, fname := range sortedLGFunctionKeys(funcs) {
+				fn := funcs[fname]
 				newmodtb.RawSetString(fname, ls.NewFunction(fn))
 			}
 			ls.SetField(tb, name, newmodtb)
@@ -302,10 +316,20 @@ func (ls *LState) RegisterModule(name string, funcs map[string]LGFunction) LValu
 }
 
 func (ls *LState) SetFuncs(tb *LTable, funcs map[string]LGFunction, upvalues ...LValue) *LTable {
-	for fname, fn := range funcs {
+	for _, fname := range sortedLGFunctionKeys(funcs) {
+		fn := funcs[fname]
 		tb.RawSetString(fname, ls.NewClosure(fn, upvalues...))
 	}
 	return tb
+}
+
+func sortedLGFunctionKeys(funcs map[string]LGFunction) []string {
+	keys := make([]string, 0, len(funcs))
+	for name := range funcs {
+		keys = append(keys, name)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 /* }}} */

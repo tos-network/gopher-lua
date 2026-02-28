@@ -1,112 +1,109 @@
 package lua
 
+const coroutineEntryPointKey = "__co_entrypoint"
+
 func OpenCoroutine(L *LState) int {
-	// TODO: Tie module name to contents of linit.go?
-	mod := L.RegisterModule(CoroutineLibName, coFuncs)
+	mod := L.RegisterModule(CoroutineLibName, coroutineFuncs).(*LTable)
 	L.Push(mod)
 	return 1
 }
 
-var coFuncs = map[string]LGFunction{
-	"create":  coCreate,
-	"yield":   coYield,
-	"resume":  coResume,
-	"running": coRunning,
-	"status":  coStatus,
-	"wrap":    coWrap,
+var coroutineFuncs = map[string]LGFunction{
+	"create":  coroutineCreate,
+	"resume":  coroutineResume,
+	"running": coroutineRunning,
+	"status":  coroutineStatus,
+	"wrap":    coroutineWrap,
+	"yield":   coroutineYield,
 }
 
-func coCreate(L *LState) int {
+func coroutineCreate(L *LState) int {
 	fn := L.CheckFunction(1)
-	newthread, _ := L.NewThread()
-	base := 0
-	newthread.stack.Push(callFrame{
-		Fn:         fn,
-		Pc:         0,
-		Base:       base,
-		LocalBase:  base + 1,
-		ReturnBase: base,
-		NArgs:      0,
-		NRet:       MultRet,
-		Parent:     nil,
-		TailCall:   0,
-	})
-	L.Push(newthread)
+	th, _ := L.NewThread()
+	th.Env.RawSetString(coroutineEntryPointKey, fn)
+	L.Push(th)
 	return 1
 }
 
-func coYield(L *LState) int {
-	return -1
-}
-
-func coResume(L *LState) int {
+func coroutineResume(L *LState) int {
 	th := L.CheckThread(1)
-	if L.G.CurrentThread == th {
-		msg := "can not resume a running thread"
-		if th.wrapped {
-			L.RaiseError(msg)
-			return 0
-		}
+	entry := th.Env.RawGetString(coroutineEntryPointKey)
+	fn, ok := entry.(*LFunction)
+	if !ok {
+		L.RaiseError("coroutine entry point is missing")
+		return 0
+	}
+	args := make([]LValue, 0, L.GetTop()-1)
+	for i := 2; i <= L.GetTop(); i++ {
+		args = append(args, L.Get(i))
+	}
+	st, err, values := L.Resume(th, fn, args...)
+	if st == ResumeError {
 		L.Push(LFalse)
-		L.Push(LString(msg))
+		if err != nil {
+			L.Push(LString(err.Error()))
+		} else {
+			L.Push(LString("resume failed"))
+		}
 		return 2
 	}
-	if th.Dead {
-		msg := "can not resume a dead thread"
-		if th.wrapped {
-			L.RaiseError(msg)
-			return 0
-		}
-		L.Push(LFalse)
-		L.Push(LString(msg))
-		return 2
+	L.Push(LTrue)
+	for _, v := range values {
+		L.Push(v)
 	}
-	th.Parent = L
-	L.G.CurrentThread = th
-	if !th.isStarted() {
-		cf := th.stack.Last()
-		th.currentFrame = cf
-		th.SetTop(0)
-		nargs := L.GetTop() - 1
-		L.XMoveTo(th, nargs)
-		cf.NArgs = nargs
-		th.initCallFrame(cf)
-		th.Panic = panicWithoutTraceback
-	} else {
-		nargs := L.GetTop() - 1
-		L.XMoveTo(th, nargs)
-	}
-	top := L.GetTop()
-	threadRun(th)
-	return L.GetTop() - top
+	return len(values) + 1
 }
 
-func coRunning(L *LState) int {
-	if L.G.MainThread == L {
-		L.Push(LNil)
-		return 1
-	}
+func coroutineRunning(L *LState) int {
 	L.Push(L.G.CurrentThread)
 	return 1
 }
 
-func coStatus(L *LState) int {
-	L.Push(LString(L.Status(L.CheckThread(1))))
+func coroutineStatus(L *LState) int {
+	th := L.CheckThread(1)
+	L.Push(LString(L.Status(th)))
 	return 1
 }
 
-func wrapaux(L *LState) int {
-	L.Insert(L.ToThread(UpvalueIndex(1)), 1)
-	return coResume(L)
-}
-
-func coWrap(L *LState) int {
-	coCreate(L)
-	L.CheckThread(L.GetTop()).wrapped = true
-	v := L.Get(L.GetTop())
-	L.Pop(1)
-	L.Push(L.NewClosure(wrapaux, v))
+func coroutineWrap(L *LState) int {
+	fn := L.CheckFunction(1)
+	th, _ := L.NewThread()
+	th.Env.RawSetString(coroutineEntryPointKey, fn)
+	L.Push(L.NewClosure(coroutineWrapAux, th))
 	return 1
 }
 
-//
+func coroutineWrapAux(L *LState) int {
+	th := L.CheckThread(UpvalueIndex(1))
+	entry := th.Env.RawGetString(coroutineEntryPointKey)
+	fn, ok := entry.(*LFunction)
+	if !ok {
+		L.RaiseError("coroutine entry point is missing")
+		return 0
+	}
+	args := make([]LValue, 0, L.GetTop())
+	for i := 1; i <= L.GetTop(); i++ {
+		args = append(args, L.Get(i))
+	}
+	st, err, values := L.Resume(th, fn, args...)
+	if st == ResumeError {
+		if err != nil {
+			L.RaiseError(err.Error())
+		} else {
+			L.RaiseError("resume failed")
+		}
+		return 0
+	}
+	for _, v := range values {
+		L.Push(v)
+	}
+	return len(values)
+}
+
+func coroutineYield(L *LState) int {
+	values := make([]LValue, 0, L.GetTop())
+	for i := 1; i <= L.GetTop(); i++ {
+		values = append(values, L.Get(i))
+	}
+	return L.Yield(values...)
+}
