@@ -631,3 +631,47 @@ func TestGasNotExceeded(t *testing.T) {
 		t.Fatal("expected GasUsed > 0")
 	}
 }
+
+func TestHexEscape(t *testing.T) {
+	L := NewState()
+	defer L.Close()
+
+	// Basic \xNN round-trips.
+	cases := []struct {
+		expr string // a Lua string expression (not a statement)
+		want string
+	}{
+		{`"\x00"`, "\x00"},             // null byte
+		{`"\xff"`, "\xff"},             // 0xff
+		{`"\xde\xad\xbe\xef"`, "\xde\xad\xbe\xef"}, // multi-byte
+		{`"\x41\x42\x43"`, "ABC"},      // ASCII via hex
+		{`"\x0a"`, "\n"},               // \x0a == newline
+		{`"a\x20b"`, "a b"},           // hex in middle of string
+		{`"\xDE\xAD"`, "\xde\xad"},    // uppercase hex digits
+	}
+
+	for _, tc := range cases {
+		err := L.DoString(`_result = ` + tc.expr)
+		if err != nil {
+			t.Errorf("expr %q: unexpected error: %v", tc.expr, err)
+			continue
+		}
+		got, ok := L.GetGlobal("_result").(LString)
+		if !ok {
+			t.Errorf("expr %q: result is not LString", tc.expr)
+			continue
+		}
+		if string(got) != tc.want {
+			t.Errorf("expr %q: want %q, got %q", tc.expr, tc.want, string(got))
+		}
+	}
+
+	// \x with non-hex digit must be a lexer error.
+	if err := L.DoString(`local s = "\xGG"`); err == nil {
+		t.Error(`"\xGG" should produce a lexer error but did not`)
+	}
+	// \x with only one hex digit must also error.
+	if err := L.DoString(`local s = "\x4"`); err == nil {
+		t.Error(`"\x4" (one digit) should produce a lexer error but did not`)
+	}
+}

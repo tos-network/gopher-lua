@@ -35,6 +35,10 @@ func writeChar(buf *bytes.Buffer, c int) { buf.WriteByte(byte(c)) }
 
 func isDecimal(ch int) bool { return '0' <= ch && ch <= '9' }
 
+func isHex(ch int) bool {
+	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
+}
+
 func isIdent(ch int, pos int) bool {
 	return ch == '_' || 'A' <= ch && ch <= 'Z' || 'a' <= ch && ch <= 'z' || isDecimal(ch) && pos > 0
 }
@@ -229,6 +233,19 @@ func (sc *Scanner) scanEscape(ch int, buf *bytes.Buffer) error {
 	case '\r':
 		buf.WriteByte('\n')
 		sc.Newline('\r')
+	case 'x':
+		// \xNN hex escape — exactly two hex digits required.
+		// Supported in Lua 5.2+ and Solidity; added here for alignment.
+		var hexBuf [2]byte
+		for i := range hexBuf {
+			nc := sc.Next()
+			if !isHex(nc) {
+				return sc.Error(string(rune(nc)), `\x escape requires exactly two hex digits`)
+			}
+			hexBuf[i] = byte(nc)
+		}
+		val, _ := strconv.ParseInt(string(hexBuf[:]), 16, 32)
+		writeChar(buf, int(val))
 	default:
 		if '0' <= ch && ch <= '9' {
 			bytes := []byte{byte(ch)}
