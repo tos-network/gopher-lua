@@ -456,25 +456,196 @@ is produced on any machine.
 
 ## 7. CLI Commands
 
-```sh
-# Compile source to bytecode
-tol compile trc20.tol -o trc20.toc
+The `tol` binary uses **subcommands**, following the same conventions as
+`javac`, `solc`, `go`, and `cargo`. Each subcommand has its own flags;
+global flags (`--version`, `--help`) appear before the subcommand.
 
-# Package multiple contracts into a .tor archive
-tol pack -o trc20-base-1.0.0.tor bytecode/ interfaces/ sources/ tests/
-
-# Publish a .tor to the on-chain registry
-tol publish trc20-base-1.0.0.tor --name trc20-base --version 1.0.0
-
-# Install a package (resolves from registry, writes tor.lock)
-tol install trc20-base@1.0.0
-
-# Verify a local .tor matches a registry hash
-tol verify trc20-base-1.0.0.tor toc://0xabc123...
-
-# Inspect package contents
-tol inspect trc20-base-1.0.0.tor
 ```
+tol <subcommand> [flags] <inputs...>
+```
+
+### 7.1 `tol compile` — compile TOL source
+
+```sh
+tol compile [--emit <format>] [-o <output>] [options] <input.tol>
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--emit toc` | default | Compiled bytecode artifact (`.toc`) |
+| `--emit toi` | | Interface-only declaration (`.toi`) |
+| `--emit tor` | | One-shot package archive (`.tor`) |
+| `-o, --output <file>` | `<input>.<emit>` | Output file path |
+| `--name <name>` | contract name from source | Override contract/interface name |
+| `--package-name <n>` | filename stem | Package name (for `--emit tor`) |
+| `--package-version <v>` | `"0.0.0"` | Package version (for `--emit tor`) |
+| `--include-source` | false | Embed source file in `.tor` archive |
+| `--abi` | false | Also write ABI JSON alongside `.toc` |
+| `--ast` | false | Dump parsed TOL AST to stdout |
+
+**Examples (mirroring javac/solc conventions):**
+
+```sh
+# Compile to .toc (equivalent to: javac -d . MyClass.java)
+tol compile trc20.tol
+tol compile -o out/trc20.toc trc20.tol
+
+# Emit interface file (equivalent to: solc --ir contract.sol)
+tol compile --emit toi -o ITRC20.toi trc20.tol
+tol compile --emit toi --name ITRC20 -o ITRC20.toi trc20.tol
+
+# One-shot .tol → .tor package (equivalent to: jar cf out.jar *.class)
+tol compile --emit tor -o trc20.tor trc20.tol
+tol compile --emit tor \
+    --package-name trc20-base \
+    --package-version 1.0.0 \
+    --include-source \
+    -o trc20-base-1.0.0.tor trc20.tol
+
+# Also emit ABI JSON alongside bytecode (like: solc --abi --bin contract.sol)
+tol compile --abi -o trc20.toc trc20.tol
+# → writes trc20.toc and trc20.abi.json
+
+# Dump AST (like: solc --ast-compact-json contract.sol)
+tol compile --ast trc20.tol
+```
+
+### 7.2 `tol pack` — build `.tor` from a directory
+
+```sh
+tol pack -o <output.tor> <directory>
+```
+
+Reads `manifest.json` from the directory root and packages all files.
+
+```sh
+tol pack -o trc20-base-1.0.0.tor ./contracts/
+```
+
+### 7.3 `tol inspect` — print artifact metadata
+
+```sh
+tol inspect [--json] <artifact>
+```
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as JSON (default: human-readable text) |
+
+```sh
+# Inspect .toc (like: javap -v MyClass.class)
+tol inspect trc20.toc
+tol inspect --json trc20.toc
+
+# Inspect .tor
+tol inspect trc20-base-1.0.0.tor
+tol inspect --json trc20-base-1.0.0.tor
+```
+
+**Text output example:**
+```
+Contract:      TRC20
+Compiler:      tolang/1.0.0
+TOL version:   0.2
+Bytecode:      1842 bytes
+Source hash:   0x1a2b...
+Bytecode hash: 0x3c4d...
+ABI functions: totalSupply, balanceOf, transfer, approve, transferFrom
+Storage slots: total_supply (u256), balances (mapping), allowances (mapping)
+```
+
+### 7.4 `tol verify` — validate artifact integrity
+
+```sh
+tol verify [--source <file>] <artifact>
+```
+
+| Flag | Description |
+|------|-------------|
+| `--source <file>` | Verify `.toc` `source_hash` matches this `.tol` file |
+
+```sh
+# Verify .toc internal consistency (like: jarsigner -verify)
+tol verify trc20.toc
+
+# Verify .toc against its original source
+tol verify --source trc20.tol trc20.toc
+
+# Verify .tor archive integrity
+tol verify trc20-base-1.0.0.tor
+```
+
+Exit codes: `0` = ok, `1` = invalid artifact, `2` = source hash mismatch.
+
+### 7.5 `tol install` — install from registry
+
+```sh
+tol install <name>@<version>
+tol install toc://<hash>
+```
+
+Resolves the package hash via the on-chain registry, downloads the `.tor`,
+and writes `tor.lock`.
+
+```sh
+tol install trc20-base@1.0.0
+tol install toc://0xabc123...   # direct content-hash install
+```
+
+### 7.6 `tol publish` — publish to registry
+
+```sh
+tol publish --name <name> --version <version> <package.tor>
+```
+
+```sh
+tol publish --name trc20-base --version 1.0.0 trc20-base-1.0.0.tor
+```
+
+### 7.7 `tol test` — run tests
+
+```sh
+tol test [flags] [./path/...]
+```
+
+See [TOL_TEST.md](TOL_TEST.md) for full documentation.
+
+```sh
+tol test ./...
+tol test --run test_transfer ./trc20_test.tol
+tol test --cover --covermin 80 ./...
+tol test --fuzz fuzz_transfer --fuzz-time 30s
+```
+
+### 7.8 Flag conventions
+
+| Convention | Example | Inspiration |
+|------------|---------|-------------|
+| Input files are positional | `tol compile input.tol` | javac, solc |
+| Output file with `-o` / `--output` | `tol compile -o out.toc` | gcc, solc, go |
+| Long flags with `--` | `--emit toi`, `--include-source` | solc, cargo |
+| Short alias for frequent flags | `-o` = `--output` | javac `-d` |
+| Format selection with `--emit` | `--emit toi` | solc `--abi`, `--bin`, `--ir` |
+| Uniform `--json` for machine output | `tol inspect --json` | consistent across subcommands |
+| Subcommand help | `tol compile --help` | go, cargo |
+
+### 7.9 Migration from legacy flat-flag style
+
+| Legacy (current) | New subcommand style |
+|-----------------|----------------------|
+| `tolang -ctoc out.toc input.tol` | `tol compile -o out.toc input.tol` |
+| `tolang -ctoi out.toi input.tol` | `tol compile --emit toi -o out.toi input.tol` |
+| `tolang -ctoi out.toi -ctoiname X input.tol` | `tol compile --emit toi --name X -o out.toi input.tol` |
+| `tolang -ctor out.tor input.tol` | `tol compile --emit tor -o out.tor input.tol` |
+| `tolang -ctorpkg n -ctorver v -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --include-source -o out.tor in.tol` |
+| `tolang -ctor out.tor ./dir/` | `tol pack -o out.tor ./dir/` |
+| `tolang -dtoc artifact.toc` | `tol inspect artifact.toc` |
+| `tolang -dtocj artifact.toc` | `tol inspect --json artifact.toc` |
+| `tolang -vtoc artifact.toc` | `tol verify artifact.toc` |
+| `tolang -vtoc -vtocsrc src.tol artifact.toc` | `tol verify --source src.tol artifact.toc` |
+| `tolang -dtor artifact.tor` | `tol inspect artifact.tor` |
+| `tolang -dtorj artifact.tor` | `tol inspect --json artifact.tor` |
+| `tolang -vtor artifact.tor` | `tol verify artifact.tor` |
 
 ---
 
