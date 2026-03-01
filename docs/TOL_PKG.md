@@ -623,7 +623,7 @@ tol test --fuzz fuzz_transfer --fuzz-time 30s
 | Short alias for frequent flags | `-o` = `--output` | javac `-d` |
 | Format selection with `--emit` | `--emit toi` | solc `--abi`, `--bin`, `--ir` |
 | Uniform `--json` for machine output | `tol inspect --json` | consistent across subcommands |
-| Subcommand help | `tol compile --help` | go, cargo |
+| Subcommand help | `tol compile --help` or `tol help compile` | go, cargo |
 
 ### 7.9 Legacy Flat Flags
 

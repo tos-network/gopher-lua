@@ -166,6 +166,7 @@ Bytecode safety checks:
 ```bash
 go build -o tol ./cmd/tolang
 ./tol --help
+./tol help compile
 ./tol compile contract.tol
 ./tol inspect contract.toc
 ./tol verify contract.toc
