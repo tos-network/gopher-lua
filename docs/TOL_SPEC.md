@@ -22,7 +22,7 @@ But TOL is not Yul syntax-compatible. It is designed for GTOS/Tolang runtime con
 - 32-byte address model
 - no floating point
 - no non-deterministic runtime APIs
-- canonical compile target: `TOL (typed) -> bytecode`
+- canonical compile target: `TOL (typed/lowered) -> direct IR -> bytecode`
 
 Compatibility target for v0.2:
 
@@ -31,13 +31,15 @@ Compatibility target for v0.2:
 
 Target pipeline:
 
-1. `TOL text -> TOL (typed) -> bytecode` (primary/canonical and only public path)
-2. compiler-internal lowering detail: `TOL (typed) -> backend IR -> bytecode`
+1. `TOL text -> TOL (typed/lowered) -> direct IR -> bytecode`
+   (primary/canonical and only public path)
+2. compiler-internal lowering detail:
+   `TOL (typed/lowered) -> direct IR -> bytecode`
 
 Pipeline policy on 2026-03-01:
 
 1. The deploy pipeline is locked to direct compilation:
-   `TOL text -> TOL (typed) -> bytecode`.
+   `TOL text -> TOL (typed/lowered) -> direct IR -> bytecode`.
 2. Transpile bridge routes are not part of the supported architecture.
 3. Remaining implementation gaps are tracked in Section 20.
 
@@ -749,37 +751,50 @@ Implemented:
    - plain slots (`u*`/`i*`/`bool`/`address`/`bytes`/`string`)
    - `mapping(...)` including nested mapping depth checks
    - storage arrays: `arr.length`, `arr[i]`, `arr[i]=v`, `arr.push(v)`
-6. External/public dispatch wrappers are generated using ABI signature strings.
-7. Constructor hook works for zero-parameter constructor (`tos.oncreate`).
+6. External/public dispatch wrappers are generated using selector strings:
+   default `keccak256("name(type1,type2,...)")[0:4]` in `0x????????` form,
+   and `@selector("0x........")` override.
+7. Constructor hook works and forwards runtime args via `tos.oncreate(...)`.
 8. Toolchain exists:
    - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`
    - CLI: `tolang -ctol` and `tolang -dtol`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
+10. `selector("sig")` literal calls are lowered as compile-time selector constants
+    (`0x????????`).
+12. Selector member builtins are supported for externally dispatchable functions:
+    `this.fn.selector` and `Contract.fn.selector`.
+11. Canonical backend route is direct:
+    `TOL typed/lowered -> IR -> bytecode` (no Lua transpile stage).
 
 Partially implemented:
 
 1. `interface`/`library` declarations are currently parsed in skip mode
    (accepted syntactically, not compiled to semantics).
 2. `error`/`enum`/`modifier` declarations are currently skipped, not enforced.
-3. `constructor(...)` is parsed, but compiler rejects non-empty parameter lists.
+3. Constructor parameters are accepted and forwarded by wrapper call only;
+   typed ABI decode/binding semantics are not implemented yet.
 4. `continue` semantics are lowered via deterministic labels/goto in loops,
    but still need deeper verifier checks for corner-case control flow.
 5. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
    signed arithmetic/cast verifier semantics are not yet complete.
-6. `math.binaryLog`/`math.pow2` are implemented; `math.max(xs: i256[])` in spec
+6. `selector("sig")` currently requires a string literal argument in direct IR mode;
+   dynamic selector expressions are not implemented.
+7. Selector member builtins currently work only for externally dispatchable
+   targets in current stage.
+8. `math.binaryLog`/`math.pow2` are implemented; `math.max(xs: i256[])` in spec
    is not implemented as a dedicated array intrinsic.
 
 Not implemented yet (spec gap):
 
-1. Full direct `TOL typed AST -> backend IR -> bytecode` backend completeness.
+1. Full direct `TOL typed/lowered -> IR -> bytecode` backend completeness for
+   all v0.2 mandatory features.
 2. Full verifier pipeline (name resolution, CFG/effect checks, selector uniqueness,
    inheritance checks, modifier expansion checks, interface conformance, etc.).
-3. `@selector(...)` attribute parsing/override.
-4. ABI high-level typed operations in TOL surface (`abi.decode/encode*`, tuple destructure).
-5. Custom error form `revert ErrorName(...)`.
-6. Inheritance/C3 linearization/`super` dispatch.
-7. Full host-call builtin lowering coverage (`create`, `create2`, `delegatecall`, etc.)
+3. ABI high-level typed operations in TOL surface (`abi.decode/encode*`, tuple destructure).
+4. Custom error form `revert ErrorName(...)`.
+5. Inheritance/C3 linearization/`super` dispatch.
+6. Full host-call builtin lowering coverage (`create`, `create2`, `delegatecall`, etc.)
    from TOL surface semantics.
 
 Roadmap reference:

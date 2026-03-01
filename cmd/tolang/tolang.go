@@ -18,28 +18,32 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc bool
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol string
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
 	flag.StringVar(&opt_c, "c", "", "")
+	flag.StringVar(&opt_ctol, "ctol", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
 	flag.BoolVar(&opt_dt, "dt", false, "")
 	flag.BoolVar(&opt_dc, "dc", false, "")
 	flag.BoolVar(&opt_di, "di", false, "")
 	flag.BoolVar(&opt_bc, "bc", false, "")
+	flag.BoolVar(&opt_dtol, "dtol", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: tolang [options] [script [args]].
 	Available options are:
 	  -e stat  execute string 'stat'
 	  -l name  require library 'name'
 	  -c file  compile source script to bytecode file
+	  -ctol file  compile TOL source script to bytecode file (skeleton path)
 	  -bc      treat input script as bytecode
 	  -dt      dump AST trees
 	  -dc      dump VM codes
 	  -di      dump IR
+	  -dtol    dump parsed TOL module
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -56,6 +60,14 @@ func mainAux() int {
 	}
 	if len(opt_e) == 0 && !opt_i && !opt_v && flag.NArg() == 0 {
 		opt_i = true
+	}
+	if len(opt_c) > 0 && len(opt_ctol) > 0 {
+		fmt.Println("cannot use -c and -ctol together")
+		return 1
+	}
+	if opt_bc && (len(opt_ctol) > 0 || opt_dtol) {
+		fmt.Println("-bc cannot be combined with -ctol or -dtol")
+		return 1
 	}
 
 	status := 0
@@ -98,6 +110,28 @@ func mainAux() int {
 		}
 		return 0
 	}
+	if len(opt_ctol) > 0 {
+		if flag.NArg() == 0 {
+			fmt.Println("TOL compile mode requires an input source script")
+			return 1
+		}
+		input := flag.Arg(0)
+		src, err := os.ReadFile(input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		bc, err := lua.CompileTOLToBytecode(src, input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		if err := os.WriteFile(opt_ctol, bc, 0o644); err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		return 0
+	}
 
 	if nargs := flag.NArg(); nargs > 0 {
 		script := flag.Arg(0)
@@ -111,6 +145,15 @@ func mainAux() int {
 			fmt.Println(err.Error())
 			status = 1
 		} else {
+			if opt_dtol {
+				mod, err := lua.ParseTOLModule(src, script)
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Println(mod.String())
+				return 0
+			}
 			if opt_dt || opt_dc || opt_di {
 				if opt_bc {
 					if opt_dt {

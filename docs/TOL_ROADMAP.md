@@ -4,7 +4,7 @@ Status: Draft v0.1
 Date: 2026-03-01
 Source Spec: `45-IR/TOL_SPEC.md` (Draft v0.2)
 Primary Target: Implement a production canonical pipeline in `tolang`:
-`TOL source -> typed TOL -> bytecode`, fully covering
+`TOL source -> typed/lowered TOL -> direct IR -> bytecode`, fully covering
 `conditional-tokens-market-makers/contracts/*.sol` semantics.
 
 ---
@@ -15,7 +15,7 @@ Build a deterministic, testable, and maintainable implementation of TOL v0.2 in 
 
 Success means:
 
-1. `TOL source -> typed TOL -> tolang backend IR -> bytecode` is stable and reproducible.
+1. `TOL source -> typed/lowered TOL -> direct IR -> bytecode` is stable and reproducible.
 2. TOL features required by CTMM contracts are implemented end to end.
 3. Determinism constraints are enforced (no host nondeterminism leaks).
 4. A conformance test suite proves compatibility for the targeted Solidity/OZ subset.
@@ -79,7 +79,8 @@ Exit criteria:
 
 1. Team sign-off on module boundaries.
 2. No unresolved ambiguity for v0.2 syntax/semantics blocking coding.
-3. Canonical compile route `TOL -> bytecode` is explicitly locked.
+3. Canonical compile route
+   `TOL source -> typed/lowered TOL -> direct IR -> bytecode` is explicitly locked.
 
 ---
 
@@ -252,7 +253,7 @@ Exit criteria:
 
 Goals:
 
-1. Lower typed TOL to backend IR and emit executable bytecode artifacts.
+1. Lower typed/lowered TOL directly to IR and emit executable bytecode artifacts.
 
 Deliverables:
 
@@ -304,8 +305,8 @@ Deliverables:
    - factory and deployment flow coverage
    - event and ABI checks
 2. Differential tests:
-   - `TOL source -> typed TOL -> bytecode`
-   - `TOL typed AST -> backend IR -> bytecode`
+   - `TOL source -> typed/lowered TOL -> direct IR -> bytecode`
+   - direct-lowering invariants and bytecode equivalence checks across lowering passes
 3. Fuzzers:
    - lexer/parser fuzz
    - type checker fuzz

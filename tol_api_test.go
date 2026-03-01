@@ -1,0 +1,527 @@
+package lua
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestParseTOLModule(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {}
+`)
+	mod, err := ParseTOLModule(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if mod == nil || mod.Contract == nil || mod.Contract.Name != "Demo" {
+		t.Fatalf("unexpected module: %#v", mod)
+	}
+}
+
+func TestCompileTOLToBytecodeMinimalContract(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	if len(bc) == 0 {
+		t.Fatalf("expected non-empty bytecode")
+	}
+}
+
+func TestBuildIRFromTOLMinimalContract(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {}
+`)
+	irp, err := BuildIRFromTOL(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if irp == nil || irp.Root == nil {
+		t.Fatalf("expected non-nil IR")
+	}
+	if len(irp.Root.Instructions) != 1 {
+		t.Fatalf("unexpected instruction count: %d", len(irp.Root.Instructions))
+	}
+	if irp.Root.Instructions[0].Op != OP_RETURN {
+		t.Fatalf("expected RETURN op, got=%d", irp.Root.Instructions[0].Op)
+	}
+}
+
+func TestBuildIRFromTOLFunctionSubset(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	irp, err := BuildIRFromTOL(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if irp == nil || irp.Root == nil {
+		t.Fatalf("expected non-nil IR")
+	}
+	if len(irp.Root.Instructions) < 2 {
+		t.Fatalf("expected non-trivial instruction stream")
+	}
+}
+
+func TestBuildIRFromTOLFallbackSubset(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fallback {
+    let x: u256 = 1;
+    set x = x + 2;
+    if x > 1 {
+      emit Tick(x);
+    } else {
+      revert "bad";
+    }
+    return;
+  }
+}
+`)
+	irp, err := BuildIRFromTOL(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if irp == nil || irp.Root == nil {
+		t.Fatalf("expected non-nil IR")
+	}
+	if len(irp.Root.Instructions) < 2 {
+		t.Fatalf("expected non-trivial instruction stream")
+	}
+}
+
+func TestBuildIRFromTOLFallbackForContinueSubset(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fallback {
+    let n: u256 = 3;
+    for let i: u256 = 0; i < n; i = i + 1 {
+      if i == 1 {
+        continue;
+      }
+      emit Tick(i);
+    }
+    return;
+  }
+}
+`)
+	irp, err := BuildIRFromTOL(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+	if irp == nil || irp.Root == nil {
+		t.Fatalf("expected non-nil IR")
+	}
+	if len(irp.Root.Instructions) < 3 {
+		t.Fatalf("expected non-trivial instruction stream")
+	}
+}
+
+func TestBuildIRFromTOLFallbackUnsupportedContinue(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fallback {
+    continue;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unsupported feature error")
+	}
+	if !strings.Contains(err.Error(), "TOL2007") {
+		t.Fatalf("expected TOL2007 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsUnknownFnModifier(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() onlyOwner { return; }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unsupported modifier error")
+	}
+	if !strings.Contains(err.Error(), "TOL3002") {
+		t.Fatalf("expected TOL3002 lowering error, got: %v", err)
+	}
+}
+
+func TestCompileTOLToBytecodeOnInvokeDispatchesByDefaultSelector(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn add(a: u256, b: u256) public {
+    set got = a + b;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(u256,u256)")))
+	L.Push(lNumberFromInt(3))
+	L.Push(lNumberFromInt(4))
+	if err := L.PCall(3, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+
+	if got := LVAsString(L.GetGlobal("got")); got != "7" {
+		t.Fatalf("unexpected result: got=%s want=7", got)
+	}
+}
+
+func TestCompileTOLToBytecodeOnInvokeDispatchesBySelectorOverride(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  @selector("0xdeadbeef")
+  fn add(a: u256, b: u256) public {
+    set got = a + b;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString("0xdeadbeef"))
+	L.Push(lNumberFromInt(8))
+	L.Push(lNumberFromInt(9))
+	if err := L.PCall(3, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+
+	if got := LVAsString(L.GetGlobal("got")); got != "17" {
+		t.Fatalf("unexpected result: got=%s want=17", got)
+	}
+}
+
+func TestCompileTOLToBytecodeOnInvokeFallsBack(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public {
+    set called = 1;
+    return;
+  }
+  fallback {
+    set called = 9;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString("unknown()"))
+	if err := L.PCall(1, 0, nil); err != nil {
+		t.Fatalf("unexpected oninvoke error: %v", err)
+	}
+
+	if got := LVAsString(L.GetGlobal("called")); got != "9" {
+		t.Fatalf("unexpected fallback result: got=%s want=9", got)
+	}
+}
+
+func TestCompileTOLToBytecodeOnInvokeUnknownSelectorWithoutFallback(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString("missing()"))
+	err = L.PCall(1, 0, nil)
+	if err == nil {
+		t.Fatalf("expected UNKNOWN_SELECTOR error")
+	}
+	if !strings.Contains(err.Error(), "UNKNOWN_SELECTOR") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCompileTOLToBytecodeOnCreateCallsConstructor(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  constructor {
+    set booted = 1;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oncreate := L.GetField(tos, "oncreate")
+	if oncreate == LNil {
+		t.Fatalf("expected tos.oncreate wrapper")
+	}
+
+	L.Push(oncreate)
+	if err := L.PCall(0, 0, nil); err != nil {
+		t.Fatalf("oncreate call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("booted")); got != "1" {
+		t.Fatalf("unexpected constructor side effect: got=%s want=1", got)
+	}
+}
+
+func TestCompileTOLToBytecodeOnCreatePassesConstructorArgs(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  constructor(owner: u256, supply: u256) {
+    set owner_copy = owner;
+    set supply_copy = supply;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oncreate := L.GetField(tos, "oncreate")
+	if oncreate == LNil {
+		t.Fatalf("expected tos.oncreate wrapper")
+	}
+
+	L.Push(oncreate)
+	L.Push(lNumberFromInt(11))
+	L.Push(lNumberFromInt(22))
+	if err := L.PCall(2, 0, nil); err != nil {
+		t.Fatalf("oncreate call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("owner_copy")); got != "11" {
+		t.Fatalf("unexpected owner copy: got=%s want=11", got)
+	}
+	if got := LVAsString(L.GetGlobal("supply_copy")); got != "22" {
+		t.Fatalf("unexpected supply copy: got=%s want=22", got)
+	}
+}
+
+func TestCompileTOLToBytecodeSelectorBuiltinLiteral(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn mark() public {
+    set sel = selector("transfer(address,u256)");
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("mark()")))
+	if err := L.PCall(1, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	want := selectorHexFromSignature("transfer(address,u256)")
+	if got := LVAsString(L.GetGlobal("sel")); got != want {
+		t.Fatalf("unexpected selector result: got=%s want=%s", got, want)
+	}
+}
+
+func TestCompileTOLToBytecodeSelectorBuiltinRejectsNonLiteralArg(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn bad(sig: string) public {
+    set sel = selector(sig);
+    return;
+  }
+}
+`)
+	_, err := CompileTOLToBytecode(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected compile error")
+	}
+	if !strings.Contains(err.Error(), "TOL2012") {
+		t.Fatalf("expected TOL2012 error, got: %v", err)
+	}
+}
+
+func TestCompileTOLToBytecodeSelectorMemberThisAndContract(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn mark() public {
+    set s1 = this.mark.selector;
+    set s2 = Demo.mark.selector;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("mark()")))
+	if err := L.PCall(1, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	want := selectorHexFromSignature("mark()")
+	if got := LVAsString(L.GetGlobal("s1")); got != want {
+		t.Fatalf("unexpected s1 selector: got=%s want=%s", got, want)
+	}
+	if got := LVAsString(L.GetGlobal("s2")); got != want {
+		t.Fatalf("unexpected s2 selector: got=%s want=%s", got, want)
+	}
+}
+
+func TestCompileTOLToBytecodeSelectorMemberRespectsOverride(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  @selector("0xfeedbeef")
+  fn mark() public {
+    set sel = this.mark.selector;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString("0xfeedbeef"))
+	if err := L.PCall(1, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("sel")); got != "0xfeedbeef" {
+		t.Fatalf("unexpected selector override: got=%s want=0xfeedbeef", got)
+	}
+}
