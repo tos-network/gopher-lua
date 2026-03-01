@@ -88,7 +88,8 @@ Current parser/sema coverage in this branch:
    duplicate-name checks for event params and function return-name lists,
    function parameter/return-field name collision checks,
    lexical-scope duplicate local declaration checks (`let`),
-   unreachable-statement checks after terminal control flow,
+   unreachable-statement checks after terminal control flow
+   (`return`/`revert`, loop-body `break`/`continue`, terminating `if/else`),
    selector-override visibility checks (`@selector` only on public/external),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation

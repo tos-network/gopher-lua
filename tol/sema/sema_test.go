@@ -935,6 +935,70 @@ func TestCheckAllowsStmtAfterNonTerminatingIf(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsUnreachableStmtAfterBreakInLoop(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind: "while",
+							Cond: &ast.Expr{Kind: "ident", Value: "true"},
+							Body: []ast.Statement{
+								{Kind: "break"},
+								{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+							},
+						},
+						{Kind: "return"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsUnreachableStmtAfterContinueInLoop(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind: "while",
+							Cond: &ast.Expr{Kind: "ident", Value: "true"},
+							Body: []ast.Statement{
+								{Kind: "continue"},
+								{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+							},
+						},
+						{Kind: "return"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsConstructorReturnValue(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

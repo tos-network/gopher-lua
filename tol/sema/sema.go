@@ -183,7 +183,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			}
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
-			checkUnreachableStatements(filename, fn.Body, &diags)
+			checkUnreachableStatements(filename, fn.Body, 0, &diags)
 			checkDuplicateLocals(filename, "function", fn.Name, fn.Params, fn.Body, &diags)
 			if len(fn.Returns) > 0 && !guaranteesValueReturnOrRevert(fn.Body) {
 				diags = append(diags, diag.Diagnostic{
@@ -200,14 +200,14 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, m.Contract.Constructor.Body, 0, &diags)
 			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
-			checkUnreachableStatements(filename, m.Contract.Constructor.Body, &diags)
+			checkUnreachableStatements(filename, m.Contract.Constructor.Body, 0, &diags)
 			checkDuplicateLocals(filename, "constructor", "", m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 		}
 		if m.Contract.Fallback != nil {
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, m.Contract.Fallback.Body, 0, &diags)
 			checkReturnStatements(filename, "fallback", "", false, m.Contract.Fallback.Body, &diags)
-			checkUnreachableStatements(filename, m.Contract.Fallback.Body, &diags)
+			checkUnreachableStatements(filename, m.Contract.Fallback.Body, 0, &diags)
 			checkDuplicateLocals(filename, "fallback", "", nil, m.Contract.Fallback.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, nil, m.Contract.Fallback.Body, &diags)
 		}
@@ -611,7 +611,7 @@ func guaranteesValueReturnOrRevertStmt(s ast.Statement) bool {
 	}
 }
 
-func checkUnreachableStatements(filename string, stmts []ast.Statement, diags *diag.Diagnostics) {
+func checkUnreachableStatements(filename string, stmts []ast.Statement, loopDepth int, diags *diag.Diagnostics) {
 	terminated := false
 	for _, s := range stmts {
 		if terminated {
@@ -623,34 +623,40 @@ func checkUnreachableStatements(filename string, stmts []ast.Statement, diags *d
 			continue
 		}
 		if s.Init != nil {
-			checkUnreachableStatements(filename, []ast.Statement{*s.Init}, diags)
+			checkUnreachableStatements(filename, []ast.Statement{*s.Init}, loopDepth, diags)
 		}
-		checkUnreachableStatements(filename, s.Then, diags)
-		checkUnreachableStatements(filename, s.Else, diags)
-		checkUnreachableStatements(filename, s.Body, diags)
-		if guaranteesTerminationStmt(s) {
+		checkUnreachableStatements(filename, s.Then, loopDepth, diags)
+		checkUnreachableStatements(filename, s.Else, loopDepth, diags)
+		nextLoopDepth := loopDepth
+		if s.Kind == "while" || s.Kind == "for" {
+			nextLoopDepth++
+		}
+		checkUnreachableStatements(filename, s.Body, nextLoopDepth, diags)
+		if guaranteesTerminationStmt(s, loopDepth) {
 			terminated = true
 		}
 	}
 }
 
-func guaranteesTerminationStmt(s ast.Statement) bool {
+func guaranteesTerminationStmt(s ast.Statement, loopDepth int) bool {
 	switch s.Kind {
 	case "return", "revert":
 		return true
+	case "break", "continue":
+		return loopDepth > 0
 	case "if":
 		if len(s.Then) == 0 || len(s.Else) == 0 {
 			return false
 		}
-		return blockGuaranteesTermination(s.Then) && blockGuaranteesTermination(s.Else)
+		return blockGuaranteesTermination(s.Then, loopDepth) && blockGuaranteesTermination(s.Else, loopDepth)
 	default:
 		return false
 	}
 }
 
-func blockGuaranteesTermination(stmts []ast.Statement) bool {
+func blockGuaranteesTermination(stmts []ast.Statement, loopDepth int) bool {
 	for _, s := range stmts {
-		if guaranteesTerminationStmt(s) {
+		if guaranteesTerminationStmt(s, loopDepth) {
 			return true
 		}
 	}

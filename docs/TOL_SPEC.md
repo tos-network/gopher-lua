@@ -795,7 +795,7 @@ Implemented:
 26. Local `let` declarations are uniqueness-checked per lexical scope
     (same-scope duplicates rejected; nested-scope shadowing allowed).
 27. Unreachable statements are rejected after terminal control-flow
-    (`return`, `revert`, or `if/else` where both branches terminate).
+    (`return`, `revert`, loop-body `break/continue`, or `if/else` where both branches terminate).
 
 Partially implemented:
 
