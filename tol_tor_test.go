@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -275,5 +276,60 @@ contract Demo {
 	}
 	if !bytes.Equal(a, b) {
 		t.Fatalf("expected deterministic tor output")
+	}
+}
+
+func TestCompileTOLToTORCustomPaths(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	tor, err := CompileTOLToTOR(src, "demo.tol", &TORCompileOptions{
+		PackageName:    "demo",
+		PackageVersion: "1.2.3",
+		TOCPath:        "artifacts/Demo.toc",
+		TOIPath:        "abi/IDemo.toi",
+		IncludeSource:  true,
+		SourcePath:     "src/demo.tol",
+	})
+	if err != nil {
+		t.Fatalf("compile tor: %v", err)
+	}
+	decoded, err := DecodeTOR(tor)
+	if err != nil {
+		t.Fatalf("decode tor: %v", err)
+	}
+	if _, ok := decoded.Files["artifacts/Demo.toc"]; !ok {
+		t.Fatalf("missing custom toc path")
+	}
+	if _, ok := decoded.Files["abi/IDemo.toi"]; !ok {
+		t.Fatalf("missing custom toi path")
+	}
+	if _, ok := decoded.Files["src/demo.tol"]; !ok {
+		t.Fatalf("missing custom source path")
+	}
+}
+
+func TestCompileTOLToTORDefaultNoSource(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	tor, err := CompileTOLToTOR(src, "demo.tol", nil)
+	if err != nil {
+		t.Fatalf("compile tor: %v", err)
+	}
+	decoded, err := DecodeTOR(tor)
+	if err != nil {
+		t.Fatalf("decode tor: %v", err)
+	}
+	for name := range decoded.Files {
+		if strings.HasPrefix(name, "sources/") {
+			t.Fatalf("unexpected source entry in default mode: %s", name)
+		}
 	}
 }
