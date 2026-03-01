@@ -58,17 +58,17 @@ Recent verifier hardening completed in this phase:
      (`CompileTOLToTOI`/`CompileTOLToTOIWithOptions`/
       `BuildTOIFromModule`/`BuildTOIFromModuleWithOptions`)
      plus lightweight `.toi` structural validator (`ValidateTOIText`)
-     and CLI output path `tolang -ctoi <out.toi> <input.tol>`
-     with optional interface-name override `-ctoiname`
-     plus CLI validator path `-vtoi`
-     plus CLI metadata inspection path `-dtoi`
+     and CLI: `tol compile --emit toi -o out.toi input.tol`
+     with optional interface-name override `--name`
+     plus CLI validator: `tol verify interface.toi`
+     plus CLI metadata inspection: `tol inspect interface.toi`
    - deterministic `.toc` artifact encode/decode API (`TOC\0` magic)
    - compile path `CompileTOLToTOC` with ABI/storage metadata payloads
-   - CLI output path `tolang -ctoc <out.toc> <input.tol>`
-   - CLI metadata dump path `tolang -dtoc <artifact.toc>` (with embedded bytecode decode check)
-   - CLI JSON metadata dump path `tolang -dtocj <artifact.toc>`
-   - CLI strict validation path `tolang -vtoc <artifact.toc>` (status-only check)
-   - optional source-hash check path `tolang -vtoc -vtocsrc <source.tol> <artifact.toc>`
+   - CLI: `tol compile -o out.toc input.tol`
+   - CLI metadata dump: `tol inspect artifact.toc`
+   - CLI JSON metadata dump: `tol inspect --json artifact.toc`
+   - CLI strict validation: `tol verify artifact.toc`
+   - optional source-hash check: `tol verify --source source.tol artifact.toc`
    - source/bytecode keccak256 hash embedding and roundtrip tests
    - decode-time strict validation (version/contract/bytecode presence,
      bytecode-hash integrity, embedded bytecode decodability,
@@ -81,12 +81,11 @@ Recent verifier hardening completed in this phase:
      plus manifest contract-reference file existence checks
      and decode-time `.toc`/`.toi` entry verification
    - one-shot `.tol` -> `.tor` API path `CompileTOLToTOR` (minimal manifest + `.toc` + `.toi`)
-   - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
-     and archive inspection
-   - `-ctor` now also supports one-shot `.tol` -> `.tor` packaging
-     with one-shot package overrides (`-ctorpkg`, `-ctorver`,
-     `-ctorifacename`, `-ctorsrc`)
-   - CLI strict TOR validation path (`-vtor`)
+   - CLI directory packaging: `tol pack -o out.tor ./dir/`
+   - CLI one-shot packaging: `tol compile --emit tor -o out.tor input.tol`
+     with overrides `--package-name`, `--package-version`, `--interface-name`, `--include-source`
+   - CLI TOR validation: `tol verify artifact.tor`
+   - CLI TOR inspection: `tol inspect artifact.tor` / `tol inspect --json artifact.tor`
 
 ---
 
