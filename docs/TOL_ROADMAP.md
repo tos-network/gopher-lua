@@ -360,7 +360,7 @@ Goals:
 Deliverables:
 
 1. CLI commands:
-   - `tolang -cir in.tol -o out.glbc`
+   - `tol compile --emit glbc -o out.glbc in.tol`
    - optional `--emit-typed-ast`, `--emit-ir`, `--abi-report`
 2. TOL formatter and linter.
 3. Source map and debug metadata export.
