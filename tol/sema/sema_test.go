@@ -778,6 +778,52 @@ func TestCheckAcceptsSelectorMemberExternalTarget(t *testing.T) {
 	}
 }
 
+func TestCheckAcceptsSelectorMemberExternalTargetWithParens(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:      "pub",
+					Modifiers: []string{"public"},
+				},
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind:   "set",
+							Target: &ast.Expr{Kind: "ident", Value: "x"},
+							Expr: &ast.Expr{
+								Kind:   "member",
+								Member: "selector",
+								Object: &ast.Expr{
+									Kind: "paren",
+									Left: &ast.Expr{
+										Kind:   "member",
+										Member: "pub",
+										Object: &ast.Expr{
+											Kind: "paren",
+											Left: &ast.Expr{
+												Kind:  "ident",
+												Value: "this",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsCallingSelectorBuiltinResult(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

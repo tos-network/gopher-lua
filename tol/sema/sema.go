@@ -1363,9 +1363,14 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 		if e.Member == "selector" {
 			ok := false
 			msg := ""
-			if e.Object != nil && e.Object.Kind == "member" && e.Object.Object != nil && e.Object.Object.Kind == "ident" {
-				scope := e.Object.Object.Value
-				fnName := e.Object.Member
+			target := stripParens(e.Object)
+			if target != nil && target.Kind == "member" {
+				scopeExpr := stripParens(target.Object)
+				scope := ""
+				if scopeExpr != nil && scopeExpr.Kind == "ident" {
+					scope = strings.TrimSpace(scopeExpr.Value)
+				}
+				fnName := strings.TrimSpace(target.Member)
 				if scope != "this" && scope != contractName {
 					msg = fmt.Sprintf("selector member scope must be 'this' or '%s'", contractName)
 				} else if vis, exists := funcVis[fnName]; !exists {
