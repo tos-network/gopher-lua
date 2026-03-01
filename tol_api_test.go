@@ -774,8 +774,8 @@ contract Demo {
 	if err == nil {
 		t.Fatalf("expected compile error")
 	}
-	if !strings.Contains(err.Error(), "TOL3002") {
-		t.Fatalf("expected TOL3002 error, got: %v", err)
+	if !strings.Contains(err.Error(), "TOL2018") {
+		t.Fatalf("expected TOL2018 error, got: %v", err)
 	}
 	if !strings.Contains(err.Error(), "requires exactly 2 index key(s)") {
 		t.Fatalf("unexpected error: %v", err)

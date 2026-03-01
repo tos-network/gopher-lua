@@ -549,3 +549,159 @@ func TestCheckRejectsFallbackReturnValue(t *testing.T) {
 		t.Fatalf("expected TOL2017, got: %v", diags)
 	}
 }
+
+func TestCheckRejectsPartialNestedMappingIndex(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Storage: &ast.StorageDecl{
+				Slots: []ast.StorageSlot{
+					{Name: "allowances", Type: "mapping(address => mapping(address => u256))"},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "owner", Type: "address"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind:   "set",
+							Target: &ast.Expr{Kind: "ident", Value: "got"},
+							Expr: &ast.Expr{
+								Kind: "index",
+								Object: &ast.Expr{
+									Kind:  "ident",
+									Value: "allowances",
+								},
+								Index: &ast.Expr{Kind: "ident", Value: "owner"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2018") {
+		t.Fatalf("expected TOL2018, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsStorageScalarIndexRead(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Storage: &ast.StorageDecl{
+				Slots: []ast.StorageSlot{
+					{Name: "total", Type: "u256"},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "i", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind:   "set",
+							Target: &ast.Expr{Kind: "ident", Value: "got"},
+							Expr: &ast.Expr{
+								Kind: "index",
+								Object: &ast.Expr{
+									Kind:  "ident",
+									Value: "total",
+								},
+								Index: &ast.Expr{Kind: "ident", Value: "i"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2018") {
+		t.Fatalf("expected TOL2018, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsStorageArrayPushLengthAndIndex(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Storage: &ast.StorageDecl{
+				Slots: []ast.StorageSlot{
+					{Name: "xs", Type: "u256[]"},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "v", Type: "u256"},
+						{Name: "i", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "push",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "xs",
+									},
+								},
+								Args: []*ast.Expr{
+									{Kind: "ident", Value: "v"},
+								},
+							},
+						},
+						{
+							Kind:   "set",
+							Target: &ast.Expr{Kind: "ident", Value: "a"},
+							Expr: &ast.Expr{
+								Kind:   "member",
+								Member: "length",
+								Object: &ast.Expr{
+									Kind:  "ident",
+									Value: "xs",
+								},
+							},
+						},
+						{
+							Kind:   "set",
+							Target: &ast.Expr{Kind: "ident", Value: "b"},
+							Expr: &ast.Expr{
+								Kind: "index",
+								Object: &ast.Expr{
+									Kind:  "ident",
+									Value: "xs",
+								},
+								Index: &ast.Expr{Kind: "ident", Value: "i"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}

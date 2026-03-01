@@ -768,6 +768,9 @@ Implemented:
 13. Early semantic verifier now rejects unsupported/conflicting function modifiers,
     duplicate parameter names, and invalid return-value usage
     (void/non-void function and constructor/fallback return shape checks).
+14. Early semantic verifier validates storage-access shape for implemented subset:
+    mapping key-depth arity, scalar non-indexability, and array-only `.length`/`.push(v)`
+    on top-level storage arrays.
 
 Partially implemented:
 

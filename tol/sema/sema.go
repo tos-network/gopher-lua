@@ -15,6 +15,26 @@ type TypedModule struct {
 	AST *ast.Module
 }
 
+type storageSlotKind string
+
+const (
+	storageKindScalar  storageSlotKind = "scalar"
+	storageKindMapping storageSlotKind = "mapping"
+	storageKindArray   storageSlotKind = "array"
+)
+
+type storageSlotInfo struct {
+	name         string
+	kind         storageSlotKind
+	typeName     string
+	mappingDepth int
+}
+
+type storageCheckCtx struct {
+	slots  map[string]storageSlotInfo
+	scopes []map[string]struct{}
+}
+
 func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if m == nil {
@@ -64,6 +84,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			diags = append(diags, modDiags...)
 			funcVis[fn.Name] = vis
 		}
+		slotInfos := map[string]storageSlotInfo{}
 
 		if m.Contract.Storage != nil {
 			slotSeen := map[string]struct{}{}
@@ -86,6 +107,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 					})
 				} else {
 					slotSeen[slot.Name] = struct{}{}
+					slotInfos[slot.Name] = buildStorageSlotInfo(slot)
 				}
 			}
 		}
@@ -133,16 +155,19 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			}
 			checkStatements(filename, m.Contract.Name, funcVis, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
+			checkStorageFunctionBody(filename, slotInfos, fn.Params, fn.Body, &diags)
 		}
 
 		if m.Contract.Constructor != nil {
 			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
 			checkStatements(filename, m.Contract.Name, funcVis, m.Contract.Constructor.Body, 0, &diags)
 			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
+			checkStorageFunctionBody(filename, slotInfos, m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 		}
 		if m.Contract.Fallback != nil {
 			checkStatements(filename, m.Contract.Name, funcVis, m.Contract.Fallback.Body, 0, &diags)
 			checkReturnStatements(filename, "fallback", "", false, m.Contract.Fallback.Body, &diags)
+			checkStorageFunctionBody(filename, slotInfos, nil, m.Contract.Fallback.Body, &diags)
 		}
 	}
 
@@ -247,6 +272,357 @@ func ownerLabel(ownerKind, ownerName string) string {
 		return fmt.Sprintf("function '%s'", ownerName)
 	}
 	return ownerKind
+}
+
+func buildStorageSlotInfo(slot ast.StorageSlot) storageSlotInfo {
+	typeName := strings.TrimSpace(slot.Type)
+	kind := classifyStorageKind(typeName)
+	return storageSlotInfo{
+		name:         slot.Name,
+		kind:         kind,
+		typeName:     typeName,
+		mappingDepth: mappingTypeDepth(typeName),
+	}
+}
+
+func classifyStorageKind(typeName string) storageSlotKind {
+	compact := strings.ReplaceAll(normalizeSelectorType(typeName), " ", "")
+	switch {
+	case strings.HasPrefix(compact, "mapping("):
+		return storageKindMapping
+	case strings.HasSuffix(compact, "]"):
+		return storageKindArray
+	default:
+		return storageKindScalar
+	}
+}
+
+func mappingTypeDepth(typeName string) int {
+	compact := strings.ReplaceAll(normalizeSelectorType(typeName), " ", "")
+	return strings.Count(compact, "mapping(")
+}
+
+func newStorageCheckCtx(slots map[string]storageSlotInfo, params []ast.FieldDecl) *storageCheckCtx {
+	c := &storageCheckCtx{
+		slots:  slots,
+		scopes: []map[string]struct{}{},
+	}
+	c.pushScope()
+	for _, p := range params {
+		c.declareLocal(p.Name)
+	}
+	return c
+}
+
+func (c *storageCheckCtx) pushScope() {
+	c.scopes = append(c.scopes, map[string]struct{}{})
+}
+
+func (c *storageCheckCtx) popScope() {
+	if len(c.scopes) == 0 {
+		return
+	}
+	c.scopes = c.scopes[:len(c.scopes)-1]
+}
+
+func (c *storageCheckCtx) declareLocal(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	if len(c.scopes) == 0 {
+		c.pushScope()
+	}
+	c.scopes[len(c.scopes)-1][name] = struct{}{}
+}
+
+func (c *storageCheckCtx) isLocal(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	for i := len(c.scopes) - 1; i >= 0; i-- {
+		if _, ok := c.scopes[i][name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *storageCheckCtx) storagePathFromExpr(e *ast.Expr) (string, []*ast.Expr, bool) {
+	if c == nil || e == nil {
+		return "", nil, false
+	}
+	switch e.Kind {
+	case "paren":
+		return c.storagePathFromExpr(e.Left)
+	case "ident":
+		name := strings.TrimSpace(e.Value)
+		if name == "" || c.isLocal(name) {
+			return "", nil, false
+		}
+		if _, ok := c.slots[name]; !ok {
+			return "", nil, false
+		}
+		return name, []*ast.Expr{}, true
+	case "index":
+		slot, keys, ok := c.storagePathFromExpr(e.Object)
+		if !ok {
+			return "", nil, false
+		}
+		out := make([]*ast.Expr, 0, len(keys)+1)
+		out = append(out, keys...)
+		out = append(out, e.Index)
+		return slot, out, true
+	default:
+		return "", nil, false
+	}
+}
+
+type storageExprUse int
+
+const (
+	storageUseValue storageExprUse = iota
+	storageUseIndexObject
+	storageUseMemberObject
+	storageUseCallCallee
+)
+
+func checkStorageFunctionBody(filename string, slots map[string]storageSlotInfo, params []ast.FieldDecl, body []ast.Statement, diags *diag.Diagnostics) {
+	if len(slots) == 0 {
+		return
+	}
+	ctx := newStorageCheckCtx(slots, params)
+	checkStorageStatements(filename, ctx, body, diags)
+}
+
+func checkStorageStatements(filename string, ctx *storageCheckCtx, stmts []ast.Statement, diags *diag.Diagnostics) {
+	for _, s := range stmts {
+		switch s.Kind {
+		case "let":
+			checkStorageExpr(filename, ctx, s.Expr, storageUseValue, diags)
+			ctx.declareLocal(s.Name)
+		case "set":
+			checkStorageSetTarget(filename, ctx, s.Target, diags)
+			checkStorageExpr(filename, ctx, s.Expr, storageUseValue, diags)
+		case "if":
+			checkStorageExpr(filename, ctx, s.Cond, storageUseValue, diags)
+			ctx.pushScope()
+			checkStorageStatements(filename, ctx, s.Then, diags)
+			ctx.popScope()
+			ctx.pushScope()
+			checkStorageStatements(filename, ctx, s.Else, diags)
+			ctx.popScope()
+		case "while":
+			checkStorageExpr(filename, ctx, s.Cond, storageUseValue, diags)
+			ctx.pushScope()
+			checkStorageStatements(filename, ctx, s.Body, diags)
+			ctx.popScope()
+		case "for":
+			ctx.pushScope()
+			if s.Init != nil {
+				checkStorageStatements(filename, ctx, []ast.Statement{*s.Init}, diags)
+			}
+			checkStorageExpr(filename, ctx, s.Cond, storageUseValue, diags)
+			checkStorageExpr(filename, ctx, s.Post, storageUseValue, diags)
+			checkStorageStatements(filename, ctx, s.Body, diags)
+			ctx.popScope()
+		default:
+			checkStorageExpr(filename, ctx, s.Expr, storageUseValue, diags)
+			checkStorageExpr(filename, ctx, s.Target, storageUseValue, diags)
+			checkStorageExpr(filename, ctx, s.Cond, storageUseValue, diags)
+			checkStorageExpr(filename, ctx, s.Post, storageUseValue, diags)
+			if s.Init != nil {
+				checkStorageStatements(filename, ctx, []ast.Statement{*s.Init}, diags)
+			}
+			if len(s.Then) > 0 {
+				ctx.pushScope()
+				checkStorageStatements(filename, ctx, s.Then, diags)
+				ctx.popScope()
+			}
+			if len(s.Else) > 0 {
+				ctx.pushScope()
+				checkStorageStatements(filename, ctx, s.Else, diags)
+				ctx.popScope()
+			}
+			if len(s.Body) > 0 {
+				ctx.pushScope()
+				checkStorageStatements(filename, ctx, s.Body, diags)
+				ctx.popScope()
+			}
+		}
+	}
+}
+
+func checkStorageSetTarget(filename string, ctx *storageCheckCtx, target *ast.Expr, diags *diag.Diagnostics) {
+	if target == nil {
+		return
+	}
+	if slotName, keys, ok := ctx.storagePathFromExpr(target); ok {
+		info := ctx.slots[slotName]
+		checkStorageKeys(filename, ctx, keys, diags)
+		validateStorageWrite(filename, info, keys, diags)
+		return
+	}
+	checkStorageExpr(filename, ctx, target, storageUseValue, diags)
+}
+
+func checkStorageExpr(filename string, ctx *storageCheckCtx, e *ast.Expr, use storageExprUse, diags *diag.Diagnostics) {
+	if e == nil {
+		return
+	}
+	if slotName, keys, ok := ctx.storagePathFromExpr(e); ok {
+		info := ctx.slots[slotName]
+		switch use {
+		case storageUseValue:
+			validateStorageRead(filename, info, keys, diags)
+		case storageUseIndexObject:
+			validateStorageIndexObject(filename, info, keys, diags)
+		case storageUseCallCallee:
+			reportStorageAccess(filename, fmt.Sprintf("storage slot '%s' is not callable", info.name), diags)
+		}
+	}
+
+	switch e.Kind {
+	case "call":
+		if e.Callee != nil && e.Callee.Kind == "member" && e.Callee.Member == "push" {
+			if slotName, keys, ok := ctx.storagePathFromExpr(e.Callee.Object); ok {
+				info := ctx.slots[slotName]
+				checkStorageKeys(filename, ctx, keys, diags)
+				validateStoragePush(filename, info, keys, len(e.Args), diags)
+				for _, a := range e.Args {
+					checkStorageExpr(filename, ctx, a, storageUseValue, diags)
+				}
+				return
+			}
+		}
+		checkStorageExpr(filename, ctx, e.Callee, storageUseCallCallee, diags)
+		for _, a := range e.Args {
+			checkStorageExpr(filename, ctx, a, storageUseValue, diags)
+		}
+	case "member":
+		if e.Member == "length" {
+			if slotName, keys, ok := ctx.storagePathFromExpr(e.Object); ok {
+				info := ctx.slots[slotName]
+				checkStorageKeys(filename, ctx, keys, diags)
+				validateStorageLength(filename, info, keys, diags)
+				return
+			}
+		}
+		if slotName, _, ok := ctx.storagePathFromExpr(e.Object); ok && e.Member != "selector" {
+			info := ctx.slots[slotName]
+			reportStorageAccess(filename, fmt.Sprintf("unsupported member access '.%s' on storage slot '%s'", e.Member, info.name), diags)
+		}
+		checkStorageExpr(filename, ctx, e.Object, storageUseMemberObject, diags)
+	case "index":
+		checkStorageExpr(filename, ctx, e.Object, storageUseIndexObject, diags)
+		checkStorageExpr(filename, ctx, e.Index, storageUseValue, diags)
+	case "binary", "assign":
+		checkStorageExpr(filename, ctx, e.Left, storageUseValue, diags)
+		checkStorageExpr(filename, ctx, e.Right, storageUseValue, diags)
+	case "unary":
+		checkStorageExpr(filename, ctx, e.Right, storageUseValue, diags)
+	case "paren":
+		checkStorageExpr(filename, ctx, e.Left, use, diags)
+	default:
+		// leaf nodes
+	}
+}
+
+func checkStorageKeys(filename string, ctx *storageCheckCtx, keys []*ast.Expr, diags *diag.Diagnostics) {
+	for _, k := range keys {
+		checkStorageExpr(filename, ctx, k, storageUseValue, diags)
+	}
+}
+
+func validateStorageRead(filename string, info storageSlotInfo, keys []*ast.Expr, diags *diag.Diagnostics) {
+	switch info.kind {
+	case storageKindScalar:
+		if len(keys) > 0 {
+			reportStorageAccess(filename, fmt.Sprintf("storage slot '%s' of type '%s' does not support indexed read", info.name, info.typeName), diags)
+		}
+	case storageKindMapping:
+		want := info.mappingDepth
+		if want <= 0 {
+			want = 1
+		}
+		if len(keys) != want {
+			reportStorageAccess(filename, fmt.Sprintf("storage mapping slot '%s' requires exactly %d index key(s), got %d", info.name, want, len(keys)), diags)
+		}
+	case storageKindArray:
+		switch len(keys) {
+		case 0:
+			reportStorageAccess(filename, fmt.Sprintf("direct storage array value read is not supported on slot '%s'; use index or .length", info.name), diags)
+		case 1:
+			// ok
+		default:
+			reportStorageAccess(filename, fmt.Sprintf("nested storage array indexing is not supported on slot '%s'", info.name), diags)
+		}
+	}
+}
+
+func validateStorageWrite(filename string, info storageSlotInfo, keys []*ast.Expr, diags *diag.Diagnostics) {
+	switch info.kind {
+	case storageKindScalar:
+		if len(keys) > 0 {
+			reportStorageAccess(filename, fmt.Sprintf("storage slot '%s' of type '%s' does not support indexed write", info.name, info.typeName), diags)
+		}
+	case storageKindMapping:
+		want := info.mappingDepth
+		if want <= 0 {
+			want = 1
+		}
+		if len(keys) != want {
+			reportStorageAccess(filename, fmt.Sprintf("storage mapping slot '%s' requires exactly %d index key(s), got %d", info.name, want, len(keys)), diags)
+		}
+	case storageKindArray:
+		if len(keys) != 1 {
+			reportStorageAccess(filename, fmt.Sprintf("storage array slot '%s' write requires exactly one index in current stage", info.name), diags)
+		}
+	}
+}
+
+func validateStorageIndexObject(filename string, info storageSlotInfo, keys []*ast.Expr, diags *diag.Diagnostics) {
+	switch info.kind {
+	case storageKindScalar:
+		reportStorageAccess(filename, fmt.Sprintf("storage slot '%s' of type '%s' is not indexable", info.name, info.typeName), diags)
+	case storageKindMapping:
+		want := info.mappingDepth
+		if want <= 0 {
+			want = 1
+		}
+		if len(keys) >= want {
+			reportStorageAccess(filename, fmt.Sprintf("mapping value of slot '%s' is not indexable beyond declared depth %d", info.name, want), diags)
+		}
+	case storageKindArray:
+		if len(keys) != 0 {
+			reportStorageAccess(filename, fmt.Sprintf("nested storage array indexing is not supported on slot '%s'", info.name), diags)
+		}
+	}
+}
+
+func validateStorageLength(filename string, info storageSlotInfo, keys []*ast.Expr, diags *diag.Diagnostics) {
+	if info.kind != storageKindArray || len(keys) != 0 {
+		reportStorageAccess(filename, fmt.Sprintf("'.length' is supported only for top-level storage arrays (slot '%s')", info.name), diags)
+	}
+}
+
+func validateStoragePush(filename string, info storageSlotInfo, keys []*ast.Expr, argCount int, diags *diag.Diagnostics) {
+	if info.kind != storageKindArray || len(keys) != 0 {
+		reportStorageAccess(filename, fmt.Sprintf("'.push(v)' is supported only for top-level storage arrays (slot '%s')", info.name), diags)
+		return
+	}
+	if argCount != 1 {
+		reportStorageAccess(filename, "storage array push requires exactly one argument", diags)
+	}
+}
+
+func reportStorageAccess(filename, msg string, diags *diag.Diagnostics) {
+	*diags = append(*diags, diag.Diagnostic{
+		Code:    diag.CodeSemaStorageAccess,
+		Message: msg,
+		Span:    defaultSpan(filename),
+	})
 }
 
 func isAssignableTarget(e *ast.Expr) bool {

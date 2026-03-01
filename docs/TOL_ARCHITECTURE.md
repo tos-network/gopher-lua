@@ -69,6 +69,8 @@ Current parser/sema coverage in this branch:
    function modifier validation (unsupported/conflicting combinations),
    duplicate parameter-name checks, return-value shape checks
    (void/non-void/constructor/fallback),
+   storage-access shape checks for implemented subset
+   (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target
