@@ -54,6 +54,8 @@ Recent verifier hardening completed in this phase:
    - declared-event resolution + arity checks for `emit`
    - revert payload shape checks (empty or valid string literal)
 6. Packaging baseline:
+   - deterministic `.toi` generation API (`CompileTOLToTOI`/`BuildTOIFromModule`)
+     and CLI output path `tolang -ctoi <out.toi> <input.tol>`
    - deterministic `.toc` artifact encode/decode API (`TOC\0` magic)
    - compile path `CompileTOLToTOC` with ABI/storage metadata payloads
    - CLI output path `tolang -ctoc <out.toc> <input.tol>`

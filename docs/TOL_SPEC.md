@@ -757,10 +757,10 @@ Implemented:
    and `@selector("0x........")` override.
 7. Constructor hook works and forwards runtime args via `tos.oncreate(...)`.
 8. Toolchain exists:
-   - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOC`,
+   - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOI`, `BuildTOIFromModule`, `CompileTOLToTOC`,
      `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`,
      `EncodeTOR`, `DecodeTOR`, `TORPackageHash`
-   - CLI: `tolang -ctol`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
+   - CLI: `tolang -ctol`, `tolang -ctoi`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
      `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
      `tolang -ctor`, `tolang -dtor`, `tolang -dtorj`, and `tolang -vtor`
 9. Deterministic integer intrinsics available in runtime math lib:
@@ -831,6 +831,9 @@ Implemented:
     (`manifest.json` first, then lexicographically sorted entries),
     path-safety validation, manifest JSON validation (`name`/`version` required),
     and package hash helper.
+33. `.toi` textual interface generation baseline is available:
+    deterministic extraction from contract AST for `public`/`external` functions
+    (with optional `@selector` lines) plus event signatures.
 
 Partially implemented:
 

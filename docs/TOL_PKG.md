@@ -11,12 +11,14 @@ Scope: File formats, package layout, standard library, and on-chain registry
 Currently landed in `tolang`:
 
 - API:
+  - `CompileTOLToTOI(source, name)` -> compile `.tol` to textual `.toi`
   - `CompileTOLToTOC(source, name)` -> compile `.tol` to deterministic `.toc`
   - `EncodeTOC(...)` / `DecodeTOC(...)`
   - `VerifyTOCSourceHash(toc, sourceBytes)`
   - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
     (`manifest.name` and `manifest.version` are required)
 - CLI:
+  - `tolang -ctoi out.toi input.tol`
   - `tolang -ctoc out.toc input.tol`
   - `tolang -dtoc artifact.toc`
   - `tolang -dtocj artifact.toc`
@@ -29,7 +31,7 @@ Currently landed in `tolang`:
 
 Not landed yet:
 
-- `.toi` compile/import flow
+- `.toi` import/type-check flow
 - high-level TOR manifest builder command (`tol package ...`)
 - registry resolution (`tor://...`, `toc://...`)
 
@@ -61,6 +63,12 @@ Not landed yet:
 A `.toi` file declares the public surface of a contract without any implementation.
 Callers import `.toi` files to call a deployed contract; they do not need the `.toc`
 bytecode.
+
+Current generated form:
+
+```
+tolang -ctoi ITRC20.toi trc20.tol
+```
 
 ```tol
 -- ITRC20.toi

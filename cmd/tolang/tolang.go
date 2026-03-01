@@ -23,13 +23,14 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc, opt_ctor, opt_vtocsrc string
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoc, opt_ctor, opt_vtocsrc string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
 	flag.StringVar(&opt_c, "c", "", "")
 	flag.StringVar(&opt_ctol, "ctol", "", "")
+	flag.StringVar(&opt_ctoi, "ctoi", "", "")
 	flag.StringVar(&opt_ctoc, "ctoc", "", "")
 	flag.StringVar(&opt_ctor, "ctor", "", "")
 	flag.StringVar(&opt_vtocsrc, "vtocsrc", "", "")
@@ -53,6 +54,7 @@ func mainAux() int {
 	  -l name  require library 'name'
 	  -c file  compile source script to bytecode file
 	  -ctol file  compile TOL source script to bytecode file (skeleton path)
+	  -ctoi file  compile TOL source script to .toi interface file
 	  -ctoc file  compile TOL source script to .toc artifact file
 	  -ctor file  package a directory into .tor archive file
 	  -bc      treat input script as bytecode
@@ -84,16 +86,20 @@ func mainAux() int {
 	if len(opt_e) == 0 && !opt_i && !opt_v && flag.NArg() == 0 {
 		opt_i = true
 	}
-	if len(opt_c) > 0 && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0) {
-		fmt.Println("cannot use -c with -ctol/-ctoc/-ctor together")
+	if len(opt_c) > 0 && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0) {
+		fmt.Println("cannot use -c with -ctol/-ctoi/-ctoc/-ctor together")
 		return 1
 	}
-	if len(opt_ctol) > 0 && len(opt_ctoc) > 0 {
-		fmt.Println("cannot use -ctol and -ctoc together")
+	if len(opt_ctol) > 0 && (len(opt_ctoi) > 0 || len(opt_ctoc) > 0) {
+		fmt.Println("cannot use -ctol with -ctoi/-ctoc together")
 		return 1
 	}
-	if len(opt_ctor) > 0 && (len(opt_ctol) > 0 || len(opt_ctoc) > 0) {
-		fmt.Println("cannot use -ctor with -ctol/-ctoc together")
+	if len(opt_ctoi) > 0 && len(opt_ctoc) > 0 {
+		fmt.Println("cannot use -ctoi and -ctoc together")
+		return 1
+	}
+	if len(opt_ctor) > 0 && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0) {
+		fmt.Println("cannot use -ctor with -ctol/-ctoi/-ctoc together")
 		return 1
 	}
 	if len(opt_vtocsrc) > 0 && !opt_vtoc {
@@ -120,8 +126,8 @@ func mainAux() int {
 		fmt.Println("cannot use -vtor with -dtor/-dtorj together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, or -vtor")
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoi, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, or -vtor")
 		return 1
 	}
 
@@ -182,6 +188,28 @@ func mainAux() int {
 			return 1
 		}
 		if err := os.WriteFile(opt_ctol, bc, 0o644); err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		return 0
+	}
+	if len(opt_ctoi) > 0 {
+		if flag.NArg() == 0 {
+			fmt.Println("TOL .toi compile mode requires an input source script")
+			return 1
+		}
+		input := flag.Arg(0)
+		src, err := os.ReadFile(input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		toi, err := lua.CompileTOLToTOI(src, input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		if err := os.WriteFile(opt_ctoi, toi, 0o644); err != nil {
 			fmt.Println(err.Error())
 			return 1
 		}

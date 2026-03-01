@@ -124,7 +124,8 @@ Current parser/sema coverage in this branch:
      `0x????????` form, supports `@selector("0x........")` override),
      fallback, or deterministic `UNKNOWN_SELECTOR`.
    Public API now also includes deterministic `.toc` artifact packing/unpacking
-   (`CompileTOLToTOC` / `EncodeTOC` / `DecodeTOC` / `VerifyTOCSourceHash`) with `TOC\0` magic,
+   (`CompileTOLToTOI` / `BuildTOIFromModule` / `CompileTOLToTOC` /
+   `EncodeTOC` / `DecodeTOC` / `VerifyTOCSourceHash`) with `TOC\0` magic,
    metadata, ABI/storage JSON payloads, and keccak256 source/bytecode hashes;
    decode path performs strict integrity checks (including metadata JSON validity)
    before returning artifact data.
