@@ -909,6 +909,22 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsTopLevelSupportDeclNameCollision(t *testing.T) {
+	src := []byte(`
+tol 0.2
+interface ICommon {}
+library ICommon {}
+contract Demo {}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected top-level name collision error")
+	}
+	if !strings.Contains(err.Error(), "TOL2026") {
+		t.Fatalf("expected TOL2026 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsNonVoidFunctionMissingReturnPath(t *testing.T) {
 	src := []byte(`
 tol 0.2

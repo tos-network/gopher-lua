@@ -80,6 +80,44 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 
 	if m.Contract != nil {
 		contractName := strings.TrimSpace(m.Contract.Name)
+		topSeen := map[string]string{}
+		for _, decl := range m.SkippedTopDecls {
+			kind := strings.TrimSpace(decl.Kind)
+			name := strings.TrimSpace(decl.Name)
+			if name == "" {
+				continue
+			}
+			if name == "this" || name == "selector" {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaReservedName,
+					Message: fmt.Sprintf("%s name '%s' is reserved and cannot be declared", kind, name),
+					Span:    defaultSpan(filename),
+				})
+			}
+			if strings.HasPrefix(name, "__tol_") {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaReservedName,
+					Message: fmt.Sprintf("%s name '%s' uses reserved internal prefix '__tol_'", kind, name),
+					Span:    defaultSpan(filename),
+				})
+			}
+			if prev, exists := topSeen[name]; exists {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaNameCollision,
+					Message: fmt.Sprintf("duplicate top-level declaration name '%s' between %s and %s", name, prev, kind),
+					Span:    defaultSpan(filename),
+				})
+				continue
+			}
+			topSeen[name] = kind
+		}
+		if prev, exists := topSeen[contractName]; exists {
+			diags = append(diags, diag.Diagnostic{
+				Code:    diag.CodeSemaNameCollision,
+				Message: fmt.Sprintf("contract name '%s' collides with top-level %s declaration", contractName, prev),
+				Span:    defaultSpan(filename),
+			})
+		}
 		if contractName == "this" || contractName == "selector" {
 			diags = append(diags, diag.Diagnostic{
 				Code:    diag.CodeSemaReservedName,

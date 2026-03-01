@@ -851,7 +851,10 @@ Implemented:
 Partially implemented:
 
 1. `interface`/`library` declarations are currently parsed in skip mode
-   (accepted syntactically, not compiled to semantics).
+   (accepted syntactically, not compiled to full semantics),
+   but top-level name-level checks are enforced:
+   reserved/internal-prefix name rejection, duplicate support-decl name rejection,
+   and collision rejection against contract name.
 2. `error`/`enum`/`modifier` declarations are currently skipped, not enforced.
 3. Constructor parameters are accepted and forwarded by wrapper call only;
    typed ABI decode/binding semantics are not implemented yet.

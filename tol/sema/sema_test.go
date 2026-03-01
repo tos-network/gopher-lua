@@ -1847,6 +1847,64 @@ func TestCheckRejectsFallbackReturnValue(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsDuplicateTopLevelSupportDeclName(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		SkippedTopDecls: []ast.SkippedTopDecl{
+			{Kind: "interface", Name: "ICommon"},
+			{Kind: "library", Name: "ICommon"},
+		},
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2026") {
+		t.Fatalf("expected TOL2026, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsContractTopLevelNameCollision(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		SkippedTopDecls: []ast.SkippedTopDecl{
+			{Kind: "interface", Name: "Demo"},
+		},
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2026") {
+		t.Fatalf("expected TOL2026, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsReservedTopLevelSupportDeclName(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		SkippedTopDecls: []ast.SkippedTopDecl{
+			{Kind: "interface", Name: "selector"},
+		},
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsPartialNestedMappingIndex(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
