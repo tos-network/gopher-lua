@@ -1228,6 +1228,12 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 				Message: "assignment target cannot be 'true', 'false', or 'nil'",
 				Span:    defaultSpan(filename),
 			})
+		} else if isSelectorMemberExpr(e.Left) {
+			*diags = append(*diags, diag.Diagnostic{
+				Code:    diag.CodeSemaInvalidSetTarget,
+				Message: "selector member expression is read-only and cannot be assignment target",
+				Span:    defaultSpan(filename),
+			})
 		}
 		checkExpr(contractName, funcVis, funcArity, filename, e.Left, diags)
 		checkExpr(contractName, funcVis, funcArity, filename, e.Right, diags)

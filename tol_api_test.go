@@ -216,6 +216,26 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsAssignExprTargetSelectorMember(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn mark() public { return; }
+  fn run() public {
+    this.mark.selector = 1;
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected set-target error")
+	}
+	if !strings.Contains(err.Error(), "TOL2008") {
+		t.Fatalf("expected TOL2008 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsDuplicateLocalLetInSameScope(t *testing.T) {
 	src := []byte(`
 tol 0.2

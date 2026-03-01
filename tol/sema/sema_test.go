@@ -273,6 +273,52 @@ func TestCheckRejectsSetTargetSelectorMemberExpr(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsAssignExprTargetSelectorMemberExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:      "mark",
+					Modifiers: []string{"public"},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "assign",
+								Left: &ast.Expr{
+									Kind:   "member",
+									Member: "selector",
+									Object: &ast.Expr{
+										Kind:   "member",
+										Member: "mark",
+										Object: &ast.Expr{
+											Kind:  "ident",
+											Value: "this",
+										},
+									},
+								},
+								Right: &ast.Expr{Kind: "number", Value: "1"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2008") {
+		t.Fatalf("expected TOL2008, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsInvalidSelectorOverride(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

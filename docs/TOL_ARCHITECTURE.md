@@ -77,6 +77,7 @@ Current parser/sema coverage in this branch:
    (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`), assignment-expression target checks,
    contract-scoped member-call target resolution checks,
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
+   selector-member assignment-target rejection (`*.selector` is read-only),
    assignment-expression placement checks (value-context rejection),
    non-void function return-path checks for current structured subset
    (all paths must value-return or `revert`; loops still conservative),

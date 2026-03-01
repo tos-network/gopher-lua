@@ -778,6 +778,7 @@ Implemented:
     (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`) and assignment-expression
     target assignability in expression context.
     Assignment targets using literal identifiers (`true`/`false`/`nil`) are rejected.
+    Selector-member targets (`*.selector`) are read-only and rejected as lvalues.
 16. Early semantic verifier restricts assignment-expression placement to supported
     statement contexts (expression statement / `for` post), rejecting value-context use.
 17. Non-void functions require all current-stage structured control paths to
