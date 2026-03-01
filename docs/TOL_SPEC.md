@@ -81,6 +81,9 @@ All observable behavior must depend only on:
 - contract storage
 - deterministic builtins
 
+For the full security design rationale, eliminated vulnerability classes, and auditor
+reference, see [TOL_AUDIT.md](TOL_AUDIT.md).
+
 ---
 
 ## 5. Module Structure
@@ -874,6 +877,14 @@ Conformance criterion:
 
 `contracts/*.sol` must lower to TOL v0.2 (or direct equivalent hand-written TOL)
 without semantic fallback to unsupported features.
+
+---
+
+## 23. Security Design
+
+See [TOL_AUDIT.md](TOL_AUDIT.md) for the full security architecture:
+eliminated vulnerability classes, language-level enforcements, verifier invariants,
+and auditor reference.
 
 Current status on 2026-03-01:
 
