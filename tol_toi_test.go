@@ -116,3 +116,30 @@ func TestValidateTOITextRejectsMalformed(t *testing.T) {
 		t.Fatalf("expected malformed toi error")
 	}
 }
+
+func TestInspectTOIText(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event Tick(v: u256);
+  fn ping() public { return; }
+}
+`)
+	toi, err := CompileTOLToTOI(src, "<tol>")
+	if err != nil {
+		t.Fatalf("compile toi: %v", err)
+	}
+	info, err := InspectTOIText(toi)
+	if err != nil {
+		t.Fatalf("inspect toi: %v", err)
+	}
+	if info.Version != "0.2" {
+		t.Fatalf("unexpected version: %s", info.Version)
+	}
+	if info.InterfaceName != "IDemo" {
+		t.Fatalf("unexpected interface: %s", info.InterfaceName)
+	}
+	if info.FunctionCount != 1 || info.EventCount != 1 {
+		t.Fatalf("unexpected counts: %+v", info)
+	}
+}

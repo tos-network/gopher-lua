@@ -61,6 +61,7 @@ Recent verifier hardening completed in this phase:
      and CLI output path `tolang -ctoi <out.toi> <input.tol>`
      with optional interface-name override `-ctoiname`
      plus CLI validator path `-vtoi`
+     plus CLI metadata inspection path `-dtoi`
    - deterministic `.toc` artifact encode/decode API (`TOC\0` magic)
    - compile path `CompileTOLToTOC` with ABI/storage metadata payloads
    - CLI output path `tolang -ctoc <out.toc> <input.tol>`

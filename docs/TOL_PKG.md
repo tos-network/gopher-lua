@@ -31,6 +31,7 @@ into a single opaque flag (`-ctoc`, `-dtocj`, `-vtor`, etc.). This style is
 # current (legacy, pending migration)
 tolang -ctoc out.toc input.tol
 tolang -ctoi out.toi input.tol
+tolang -dtoi interface.toi
 tolang -dtoc artifact.toc
 tolang -dtocj artifact.toc
 tolang -vtoc artifact.toc
@@ -640,6 +641,7 @@ tol test --fuzz fuzz_transfer --fuzz-time 30s
 | `tolang -ctoc out.toc input.tol` | `tol compile -o out.toc input.tol` |
 | `tolang -ctoi out.toi input.tol` | `tol compile --emit toi -o out.toi input.tol` |
 | `tolang -ctoi out.toi -ctoiname X input.tol` | `tol compile --emit toi --name X -o out.toi input.tol` |
+| `tolang -dtoi interface.toi` | `tol inspect interface.toi` |
 | `tolang -ctor out.tor input.tol` | `tol compile --emit tor -o out.tor input.tol` |
 | `tolang -ctorpkg n -ctorver v -ctorifacename X -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --interface-name X --include-source -o out.tor in.tol` |
 | `tolang -ctor out.tor ./dir/` | `tol pack -o out.tor ./dir/` |

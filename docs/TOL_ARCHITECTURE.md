@@ -125,7 +125,8 @@ Current parser/sema coverage in this branch:
      fallback, or deterministic `UNKNOWN_SELECTOR`.
    Public API now also includes deterministic `.toc` artifact packing/unpacking
    (`CompileTOLToTOI` / `CompileTOLToTOIWithOptions` /
-   `BuildTOIFromModule` / `BuildTOIFromModuleWithOptions` / `ValidateTOIText` /
+   `BuildTOIFromModule` / `BuildTOIFromModuleWithOptions` /
+   `ValidateTOIText` / `InspectTOIText` /
    `CompileTOLToTOC` /
    `EncodeTOC` / `DecodeTOC` / `VerifyTOCSourceHash`) with `TOC\0` magic,
    metadata, ABI/storage JSON payloads, and keccak256 source/bytecode hashes;

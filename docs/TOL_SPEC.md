@@ -762,7 +762,7 @@ Implemented:
      `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`,
      `EncodeTOR`, `DecodeTOR`, `TORPackageHash`, `CompileTOLToTOR`
    - CLI: `tolang -ctol`, `tolang -ctoi`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
-     `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
+     `tolang -dtoi`, `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
      `tolang -ctor` (directory or one-shot `.tol` input), `tolang -dtor`,
      `tolang -dtorj`, `tolang -vtor`, one-shot `-ctorpkg/-ctorver/-ctorsrc`,
      one-shot `.toi` name override `-ctorifacename`,

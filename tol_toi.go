@@ -150,3 +150,49 @@ func ValidateTOIText(data []byte) error {
 	}
 	return nil
 }
+
+// TOIInfo is lightweight metadata extracted from textual .toi content.
+type TOIInfo struct {
+	Version       string
+	InterfaceName string
+	FunctionCount int
+	EventCount    int
+}
+
+// InspectTOIText validates and extracts lightweight metadata from textual .toi content.
+func InspectTOIText(data []byte) (*TOIInfo, error) {
+	if err := ValidateTOIText(data); err != nil {
+		return nil, err
+	}
+	s := strings.TrimSpace(string(data))
+	lines := strings.Split(s, "\n")
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("toi text is empty")
+	}
+	first := strings.TrimSpace(lines[0])
+	version := strings.TrimSpace(strings.TrimPrefix(first, "tol "))
+	if version == "" {
+		return nil, fmt.Errorf("toi header missing version")
+	}
+
+	info := &TOIInfo{Version: version}
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		switch {
+		case strings.HasPrefix(line, "interface "):
+			name := strings.TrimSpace(strings.TrimPrefix(line, "interface "))
+			if idx := strings.Index(name, "{"); idx >= 0 {
+				name = strings.TrimSpace(name[:idx])
+			}
+			info.InterfaceName = name
+		case strings.HasPrefix(line, "fn "):
+			info.FunctionCount++
+		case strings.HasPrefix(line, "event "):
+			info.EventCount++
+		}
+	}
+	if info.InterfaceName == "" {
+		return nil, fmt.Errorf("toi interface name not found")
+	}
+	return info, nil
+}

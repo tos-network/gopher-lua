@@ -24,7 +24,7 @@ func main() {
 
 func mainAux() int {
 	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver, opt_ctorifacename string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_vtoi, opt_ctorsrc bool
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoi, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_vtoi, opt_ctorsrc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
@@ -45,6 +45,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_di, "di", false, "")
 	flag.BoolVar(&opt_bc, "bc", false, "")
 	flag.BoolVar(&opt_dtol, "dtol", false, "")
+	flag.BoolVar(&opt_dtoi, "dtoi", false, "")
 	flag.BoolVar(&opt_dtoc, "dtoc", false, "")
 	flag.BoolVar(&opt_dtocj, "dtocj", false, "")
 	flag.BoolVar(&opt_vtoc, "vtoc", false, "")
@@ -73,6 +74,7 @@ func mainAux() int {
 	  -dc      dump VM codes
 	  -di      dump IR
 	  -dtol    dump parsed TOL module
+	  -dtoi    dump parsed TOI metadata
 	  -dtoc    dump parsed TOC artifact metadata
 	  -dtocj   dump parsed TOC artifact metadata as JSON
 	  -dtor    dump parsed TOR archive metadata
@@ -146,8 +148,8 @@ func mainAux() int {
 		fmt.Println("cannot use -vtor with -dtor/-dtorj together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor || opt_vtoi) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoi, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, -vtor, or -vtoi")
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoi || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor || opt_vtoi) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoi, -ctoc, -ctor, -dtol, -dtoi, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, -vtor, or -vtoi")
 		return 1
 	}
 
@@ -327,6 +329,18 @@ func mainAux() int {
 					return 1
 				}
 				fmt.Println(mod.String())
+				return 0
+			}
+			if opt_dtoi {
+				info, err := lua.InspectTOIText(src)
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Printf("TOI version: %s\n", info.Version)
+				fmt.Printf("Interface: %s\n", info.InterfaceName)
+				fmt.Printf("Functions: %d\n", info.FunctionCount)
+				fmt.Printf("Events: %d\n", info.EventCount)
 				return 0
 			}
 			if opt_dtoc {
