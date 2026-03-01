@@ -808,6 +808,8 @@ Implemented:
     (`return`, `revert`, loop-body `break/continue`, or `if/else` where both branches terminate).
 28. Contract-scoped member calls (`this.fn(...)`, `Contract.fn(...)`) must
     resolve to declared contract functions and target `public/external` functions only.
+29. Function name `selector` is reserved for builtin `selector("...")` and
+    cannot be declared as a contract function name.
 
 Partially implemented:
 

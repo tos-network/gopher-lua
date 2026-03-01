@@ -37,6 +37,7 @@ const (
 	CodeSemaUnreachableStmt      = "TOL2030"
 	CodeSemaUnknownCallTarget    = "TOL2031"
 	CodeSemaCallVisibility       = "TOL2032"
+	CodeSemaReservedName         = "TOL2033"
 	CodeLowerNotImplemented      = "TOL3001"
 	CodeLowerUnsupportedFeature  = "TOL3002"
 	CodeCodegenNotImplemented    = "TOL4001"

@@ -132,6 +132,13 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		funcSeen := map[string]struct{}{}
 		selectorSeen := map[string]string{}
 		for _, fn := range m.Contract.Functions {
+			if strings.TrimSpace(fn.Name) == "selector" {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaReservedName,
+					Message: "function name 'selector' is reserved for builtin selector(...)",
+					Span:    defaultSpan(filename),
+				})
+			}
 			diags = append(diags, duplicateParamDiagnostics(filename, "function", fn.Name, fn.Params)...)
 			diags = append(diags, duplicateParamDiagnostics(filename, "returns", fn.Name, fn.Returns)...)
 			diags = append(diags, checkParamReturnNameCollisions(filename, fn.Name, fn.Params, fn.Returns)...)

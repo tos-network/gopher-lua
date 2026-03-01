@@ -98,6 +98,7 @@ Current parser/sema coverage in this branch:
    unreachable-statement checks after terminal control flow
    (`return`/`revert`, loop-body `break`/`continue`, terminating `if/else`),
    selector-override visibility checks (`@selector` only on public/external),
+   reserved builtin-name checks (`selector` cannot be declared as function name),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target
