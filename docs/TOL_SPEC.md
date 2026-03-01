@@ -765,6 +765,9 @@ Implemented:
 12. Storage lowering in direct-IR path supports a deterministic core subset:
     scalar slot reads/writes, mapping reads/writes (with exact declared key depth),
     and top-level storage dynamic array `arr[i]`, `arr.length`, `arr.push(v)`.
+13. Early semantic verifier now rejects unsupported/conflicting function modifiers,
+    duplicate parameter names, and invalid return-value usage
+    (void/non-void function and constructor/fallback return shape checks).
 
 Partially implemented:
 

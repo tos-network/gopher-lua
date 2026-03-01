@@ -66,6 +66,9 @@ Current parser/sema coverage in this branch:
    version gate, missing contract, duplicate storage slots, duplicate function
    names (no overload yet), break/continue loop-context validation,
    `set` target assignability checks,
+   function modifier validation (unsupported/conflicting combinations),
+   duplicate parameter-name checks, return-value shape checks
+   (void/non-void/constructor/fallback),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target

@@ -60,7 +60,9 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 	if m.Contract != nil {
 		funcVis := map[string]string{}
 		for _, fn := range m.Contract.Functions {
-			funcVis[fn.Name] = functionVisibility(fn.Modifiers)
+			vis, modDiags := validateFunctionModifiers(filename, fn.Name, fn.Modifiers)
+			diags = append(diags, modDiags...)
+			funcVis[fn.Name] = vis
 		}
 
 		if m.Contract.Storage != nil {
@@ -91,6 +93,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		funcSeen := map[string]struct{}{}
 		selectorSeen := map[string]string{}
 		for _, fn := range m.Contract.Functions {
+			diags = append(diags, duplicateParamDiagnostics(filename, "function", fn.Name, fn.Params)...)
 			if _, ok := funcSeen[fn.Name]; ok {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaDuplicateFunction,
@@ -129,13 +132,17 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 				}
 			}
 			checkStatements(filename, m.Contract.Name, funcVis, fn.Body, 0, &diags)
+			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
 		}
 
 		if m.Contract.Constructor != nil {
+			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
 			checkStatements(filename, m.Contract.Name, funcVis, m.Contract.Constructor.Body, 0, &diags)
+			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
 		}
 		if m.Contract.Fallback != nil {
 			checkStatements(filename, m.Contract.Name, funcVis, m.Contract.Fallback.Body, 0, &diags)
+			checkReturnStatements(filename, "fallback", "", false, m.Contract.Fallback.Body, &diags)
 		}
 	}
 
@@ -206,6 +213,40 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 			checkStatements(filename, contractName, funcVis, s.Body, loopDepth, diags)
 		}
 	}
+}
+
+func checkReturnStatements(filename, ownerKind, ownerName string, expectsValue bool, stmts []ast.Statement, diags *diag.Diagnostics) {
+	for _, s := range stmts {
+		if s.Kind == "return" {
+			switch {
+			case expectsValue && s.Expr == nil:
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidReturn,
+					Message: fmt.Sprintf("%s requires a return value", ownerLabel(ownerKind, ownerName)),
+					Span:    defaultSpan(filename),
+				})
+			case !expectsValue && s.Expr != nil:
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidReturn,
+					Message: fmt.Sprintf("%s must not return a value", ownerLabel(ownerKind, ownerName)),
+					Span:    defaultSpan(filename),
+				})
+			}
+		}
+		if s.Init != nil {
+			checkReturnStatements(filename, ownerKind, ownerName, expectsValue, []ast.Statement{*s.Init}, diags)
+		}
+		checkReturnStatements(filename, ownerKind, ownerName, expectsValue, s.Then, diags)
+		checkReturnStatements(filename, ownerKind, ownerName, expectsValue, s.Else, diags)
+		checkReturnStatements(filename, ownerKind, ownerName, expectsValue, s.Body, diags)
+	}
+}
+
+func ownerLabel(ownerKind, ownerName string) string {
+	if ownerKind == "function" && strings.TrimSpace(ownerName) != "" {
+		return fmt.Sprintf("function '%s'", ownerName)
+	}
+	return ownerKind
 }
 
 func isAssignableTarget(e *ast.Expr) bool {
@@ -292,6 +333,109 @@ func functionVisibility(modifiers []string) string {
 		}
 	}
 	return vis
+}
+
+func validateFunctionModifiers(filename string, fnName string, modifiers []string) (string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	vis := ""
+	hasView := false
+	hasPure := false
+	hasPayable := false
+
+	for _, m := range modifiers {
+		switch m {
+		case "public", "external", "internal", "private":
+			if vis != "" && vis != m {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting visibility modifiers '%s' and '%s' on function '%s'", vis, m, fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			vis = m
+		case "view":
+			if hasPayable {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting modifiers 'view' and 'payable' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			if hasPure {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting modifiers 'view' and 'pure' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			hasView = true
+		case "pure":
+			if hasPayable {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting modifiers 'pure' and 'payable' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			if hasView {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting modifiers 'pure' and 'view' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			hasPure = true
+		case "payable":
+			if hasView {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting modifiers 'payable' and 'view' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			if hasPure {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting modifiers 'payable' and 'pure' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
+			hasPayable = true
+		default:
+			diags = append(diags, diag.Diagnostic{
+				Code:    diag.CodeSemaInvalidFnModifier,
+				Message: fmt.Sprintf("unsupported function modifier '%s' on function '%s'", m, fnName),
+				Span:    defaultSpan(filename),
+			})
+		}
+	}
+
+	return vis, diags
+}
+
+func duplicateParamDiagnostics(filename, ownerKind, ownerName string, params []ast.FieldDecl) diag.Diagnostics {
+	var out diag.Diagnostics
+	seen := map[string]struct{}{}
+	for _, p := range params {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			subject := ownerKind
+			if ownerKind == "function" {
+				subject = fmt.Sprintf("function '%s'", ownerName)
+			}
+			out = append(out, diag.Diagnostic{
+				Code:    diag.CodeSemaDuplicateParam,
+				Message: fmt.Sprintf("duplicate parameter '%s' in %s", name, subject),
+				Span:    defaultSpan(filename),
+			})
+			continue
+		}
+		seen[name] = struct{}{}
+	}
+	return out
 }
 
 func selectorDispatchKey(fn ast.FunctionDecl) (string, bool) {

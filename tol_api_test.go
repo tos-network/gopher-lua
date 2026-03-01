@@ -157,8 +157,8 @@ contract Demo {
 	if err == nil {
 		t.Fatalf("expected unsupported modifier error")
 	}
-	if !strings.Contains(err.Error(), "TOL3002") {
-		t.Fatalf("expected TOL3002 lowering error, got: %v", err)
+	if !strings.Contains(err.Error(), "TOL2014") {
+		t.Fatalf("expected TOL2014 sema error, got: %v", err)
 	}
 }
 
