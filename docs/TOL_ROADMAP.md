@@ -24,12 +24,16 @@ Milestone progress snapshot:
 9. `M8` - Not started.
 10. `M9` - Not started.
 11. `M10` - Not started.
+12. `M-lib` - Not started (package format + CLI).
+13. `M-stdlib` - Not started (full OZ-equivalent standard library).
+14. `M-registry` - Not started (on-chain package registry).
 
 Recent verifier hardening completed in this phase:
 
 1. Selector/dispatch safety checks:
    - `@selector` visibility + format + uniqueness checks
    - `selector("sig")` literal-only, signature-form validation, and empty/malformed rejection
+   - selector literal arg list enforces canonical no-whitespace token form
    - selector builtin/member usage shape checks (`expr-only`, `emit`-payload rejection)
    - selector expression results are non-callable (`selector("...")(...)` / `*.selector(...)` rejected)
    - parenthesized selector-member forms are normalized (`(this.fn).selector`, `(Contract.fn).selector`)
@@ -361,6 +365,97 @@ Exit criteria:
 
 ---
 
+## M-lib - Package System and Format
+
+Goals:
+
+1. Define and implement `.toc`, `.toi`, `.tor` file formats.
+2. Implement `tol compile`, `tol pack`, `tol install`, `tol verify` CLI commands.
+3. Implement `tor.lock` reproducible dependency pinning.
+
+Deliverables:
+
+1. `.toc` binary format with magic, ABI, storage layout, and bytecode hash fields.
+2. `.toi` interface-only source format parsed by compiler for call-site type checking.
+3. `.tor` ZIP archive layout with `manifest.json`, `bytecode/`, `interfaces/`, `sources/`, `tests/`.
+4. Import resolution: local path → registry name → content hash (three forms).
+5. `tor.lock` lockfile written on `tol install`, verified on CI builds.
+6. CLI: `tol compile`, `tol pack`, `tol publish`, `tol install`, `tol verify`, `tol inspect`.
+
+Exit criteria:
+
+1. A `.tor` produced by `tol pack` can be installed and imported by another contract.
+2. Content-hash imports are resolved deterministically and verified against lockfile.
+3. A build with a tampered `.tor` is rejected at hash-verification step.
+
+---
+
+## M-stdlib - Official Standard Library
+
+Goals:
+
+1. Implement the full OpenZeppelin Contracts surface as audited TOL packages.
+2. Omit features that are architecturally impossible or unnecessary in TOL
+   (ReentrancyGuard, SafeMath, proxy patterns).
+
+Deliverables:
+
+| Package | Contents | OZ equivalent |
+|---------|----------|---------------|
+| `trc20-base.tor` | TRC20, Burnable, Mintable, Capped, Pausable, Permit, Votes, Wrapper | ERC20 + extensions |
+| `trc721-base.tor` | TRC721, Burnable, Enumerable, URIStorage, Pausable, Royalty | ERC721 + extensions |
+| `trc1155-base.tor` | TRC1155, Burnable, Supply, Pausable | ERC1155 + extensions |
+| `trc4626-base.tor` | TRC4626 tokenized vault | ERC4626 |
+| `tol-access.tor` | Ownable, Ownable2Step, AccessControl, AccessControlEnumerable | OZ Access |
+| `tol-security.tor` | Pausable | OZ Security (minus ReentrancyGuard) |
+| `tol-math.tor` | Math, SignedMath, SafeCast, FixedPoint, LMSRMath | OZ Math + ABDKMathQuad |
+| `tol-collections.tor` | EnumerableSet, EnumerableMap, Arrays, Counters, BitMap | OZ Utils |
+| `tol-crypto.tor` | ECDSA, MerkleProof, MessageHashUtils, EIP712 | OZ Cryptography |
+| `tol-finance.tor` | VestingWallet, PaymentSplitter | OZ Finance |
+| `tol-governance.tor` | Governor, GovernorSettings, GovernorVotes, TimelockController | OZ Governance |
+
+Each package ships with:
+- Full `.toi` interface files
+- Compiled `.toc` bytecode
+- `*_test.tol` test suite (≥ 80% branch coverage gate)
+- Source `.tol` files for audit verification
+
+Exit criteria:
+
+1. All packages compile cleanly against TOL v0.2.
+2. Each package test suite passes with `-covermin 80`.
+3. `trc20-base`, `trc721-base`, `tol-math` are published to the on-chain registry.
+4. CTMM contracts can be written using only tol-stdlib packages.
+
+---
+
+## M-registry - On-chain Package Registry
+
+Goals:
+
+1. Deploy the `TolRegistry` contract on GTOS.
+2. Implement `tol publish` and `tol install` against the live registry.
+
+Deliverables:
+
+1. `TolRegistry.tol` contract:
+   - `register(name, version, package_hash)` — permanent, no overwrite.
+   - `resolve(name, version) -> hash` — content-hash lookup.
+   - `Registered` event for indexing.
+2. GTOS registry deployment at a well-known address.
+3. `tol publish` CLI command authenticates and calls `register`.
+4. `tol install` resolves name → hash → fetches `.tor` from GTOS code storage.
+5. Registry indexer for web-based package search.
+
+Exit criteria:
+
+1. `tol publish trc20-base-1.0.0.tor` succeeds on GTOS testnet.
+2. `tol install trc20-base@1.0.0` resolves and verifies hash on a fresh machine.
+3. Attempting to re-register `trc20-base@1.0.0` with different content is rejected.
+4. All tol-stdlib packages are registered and resolvable.
+
+---
+
 ## M10 - GTOS Integration Readiness
 
 Goals:
@@ -401,6 +496,12 @@ Gate D (Integration Complete):
 
 1. M10 completed.
 2. GTOS deployment pipeline supports TOL bytecode in production mode.
+
+Gate E (Ecosystem Complete):
+
+1. M-lib, M-stdlib, M-registry completed.
+2. Full OpenZeppelin-equivalent library published and resolvable on GTOS.
+3. Any TOL contract can import tol-stdlib packages via content-hash imports.
 
 ---
 

@@ -628,7 +628,11 @@ func isSelectorSignatureLiteralExpr(e *ast.Expr) bool {
 		return true
 	}
 	for _, p := range strings.Split(args, ",") {
-		if strings.TrimSpace(p) == "" {
+		token := strings.TrimSpace(p)
+		if token == "" {
+			return false
+		}
+		if p != token || strings.ContainsAny(token, " \t\r\n") {
 			return false
 		}
 	}

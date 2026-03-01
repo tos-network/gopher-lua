@@ -833,7 +833,8 @@ Partially implemented:
 6. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
    signed arithmetic/cast verifier semantics are not yet complete.
 7. `selector("sig")` currently requires a string literal in signature form
-   (`name(type1,type2,...)`, no empty arg entries) in direct IR mode;
+   (`name(type1,type2,...)`, no empty arg entries, canonical no-whitespace arg tokens)
+   in direct IR mode;
    dynamic selector expressions are not implemented.
 8. Selector member builtins currently work only for externally dispatchable
    targets in current stage.
@@ -920,5 +921,36 @@ Current status on 2026-03-01:
 1. This conformance criterion is not yet met.
 2. Main blockers are inheritance/modifiers/interfaces, typed ABI ops, and
    full verifier + direct TOL backend completeness.
+
+---
+
+## 25. Package System
+
+TOL defines three file formats for compiled artifacts and reusable packages:
+
+| Extension | Name | Description |
+|-----------|------|-------------|
+| `.toc` | TOL compiled | Compiled bytecode for one contract unit |
+| `.toi` | TOL interface | Interface-only declaration; no bytecode |
+| `.tor` | TOL runtime package | Archive of `.toc` + `.toi` + metadata |
+
+Packages are imported using three forms, in increasing order of security:
+
+```tol
+import ITRC20 from "./trc20.tol"              -- local source (dev only)
+import ITRC20 from "tor://trc20-base@1.0.0"  -- registry name (version-locked)
+import ITRC20 from "toc://0xabc123..."        -- content hash (immutable)
+```
+
+The official standard library (`tol-stdlib`) covers the full OpenZeppelin Contracts
+surface adapted for TOL and GTOS, organized into packages:
+`trc20-base`, `trc721-base`, `trc1155-base`, `trc4626-base`,
+`tol-access`, `tol-security`, `tol-math`, `tol-collections`,
+`tol-crypto`, `tol-finance`, `tol-governance`.
+
+The on-chain registry (`TolRegistry`) maps `name@version` to content hashes
+permanently and without overwrite — preventing supply-chain attacks.
+
+See [TOL_PKG.md](TOL_PKG.md) for the full package system specification.
 
 End of draft.
