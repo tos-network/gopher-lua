@@ -27,12 +27,13 @@ type TORArtifact struct {
 
 // TORCompileOptions configures one-shot .tol -> .tor compilation.
 type TORCompileOptions struct {
-	PackageName    string
-	PackageVersion string
-	TOCPath        string
-	TOIPath        string
-	IncludeSource  bool
-	SourcePath     string
+	PackageName      string
+	PackageVersion   string
+	TOCPath          string
+	TOIPath          string
+	TOIInterfaceName string
+	IncludeSource    bool
+	SourcePath       string
 }
 
 // IsTOR reports whether input starts with local-file ZIP magic.
@@ -68,7 +69,9 @@ func CompileTOLToTOR(source []byte, name string, opts *TORCompileOptions) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	toi, err := BuildTOIFromModule(mod)
+	toi, err := BuildTOIFromModuleWithOptions(mod, &TOICompileOptions{
+		InterfaceName: strings.TrimSpace(optsOrDefault(opts).TOIInterfaceName),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +148,13 @@ func CompileTOLToTOR(source []byte, name string, opts *TORCompileOptions) ([]byt
 		files[sourcePath] = source
 	}
 	return EncodeTOR(manifestJSON, files)
+}
+
+func optsOrDefault(opts *TORCompileOptions) TORCompileOptions {
+	if opts == nil {
+		return TORCompileOptions{}
+	}
+	return *opts
 }
 
 // EncodeTOR serializes manifest + files into deterministic .tor bytes.

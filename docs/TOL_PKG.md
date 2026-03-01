@@ -14,6 +14,7 @@ Scope: File formats, package layout, standard library, and on-chain registry
 - `ValidateTOIText(toiBytes)` — lightweight `.toi` structural validator
 - `CompileTOLToTOC(source, name)` — emit `.toc`
 - `CompileTOLToTOR(source, name, opts)` — one-shot `.tol` → minimal `.tor`
+  (`opts` supports package/version and `.toi` interface-name overrides)
 - `EncodeTOC(...)` / `DecodeTOC(...)` / `VerifyTOCSourceHash(toc, sourceBytes)`
 - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
   (`contracts[*].name` and at least one of `toc`/`toi` are required;
@@ -36,7 +37,7 @@ tolang -vtoc artifact.toc
 tolang -vtoc -vtocsrc source.tol artifact.toc
 tolang -vtoi interface.toi
 tolang -ctor out.tor <dir_or_file.tol>
-tolang -ctorpkg name -ctorver 1.0.0 -ctorsrc -ctor out.tor input.tol
+tolang -ctorpkg name -ctorver 1.0.0 -ctorifacename X -ctorsrc -ctor out.tor input.tol
 tolang -dtor artifact.tor
 tolang -dtorj artifact.tor
 tolang -vtor artifact.tor
@@ -640,7 +641,7 @@ tol test --fuzz fuzz_transfer --fuzz-time 30s
 | `tolang -ctoi out.toi input.tol` | `tol compile --emit toi -o out.toi input.tol` |
 | `tolang -ctoi out.toi -ctoiname X input.tol` | `tol compile --emit toi --name X -o out.toi input.tol` |
 | `tolang -ctor out.tor input.tol` | `tol compile --emit tor -o out.tor input.tol` |
-| `tolang -ctorpkg n -ctorver v -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --include-source -o out.tor in.tol` |
+| `tolang -ctorpkg n -ctorver v -ctorifacename X -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --interface-name X --include-source -o out.tor in.tol` |
 | `tolang -ctor out.tor ./dir/` | `tol pack -o out.tor ./dir/` |
 | `tolang -dtoc artifact.toc` | `tol inspect artifact.toc` |
 | `tolang -dtocj artifact.toc` | `tol inspect --json artifact.toc` |

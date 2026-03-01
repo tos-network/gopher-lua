@@ -23,7 +23,7 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver string
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver, opt_ctorifacename string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_vtoi, opt_ctorsrc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
@@ -36,6 +36,7 @@ func mainAux() int {
 	flag.StringVar(&opt_ctor, "ctor", "", "")
 	flag.StringVar(&opt_ctorpkg, "ctorpkg", "", "")
 	flag.StringVar(&opt_ctorver, "ctorver", "", "")
+	flag.StringVar(&opt_ctorifacename, "ctorifacename", "", "")
 	flag.StringVar(&opt_vtocsrc, "vtocsrc", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
@@ -65,6 +66,7 @@ func mainAux() int {
 	  -ctor file  package a directory into .tor archive file
 	  -ctorpkg name  package name override for one-shot -ctor <file.tol>
 	  -ctorver ver  package version override for one-shot -ctor <file.tol>
+	  -ctorifacename name  .toi interface name override for one-shot -ctor <file.tol>
 	  -ctorsrc   include source file in one-shot -ctor <file.tol>
 	  -bc      treat input script as bytecode
 	  -dt      dump AST trees
@@ -120,8 +122,8 @@ func mainAux() int {
 		fmt.Println("-ctoiname requires -ctoi")
 		return 1
 	}
-	if (len(opt_ctorpkg) > 0 || len(opt_ctorver) > 0 || opt_ctorsrc) && len(opt_ctor) == 0 {
-		fmt.Println("-ctorpkg/-ctorver/-ctorsrc require -ctor")
+	if (len(opt_ctorpkg) > 0 || len(opt_ctorver) > 0 || len(opt_ctorifacename) > 0 || opt_ctorsrc) && len(opt_ctor) == 0 {
+		fmt.Println("-ctorpkg/-ctorver/-ctorifacename/-ctorsrc require -ctor")
 		return 1
 	}
 	if opt_dtoc && opt_vtoc {
@@ -287,9 +289,10 @@ func mainAux() int {
 				return 1
 			}
 			tor, err = lua.CompileTOLToTOR(src, input, &lua.TORCompileOptions{
-				PackageName:    opt_ctorpkg,
-				PackageVersion: opt_ctorver,
-				IncludeSource:  opt_ctorsrc,
+				PackageName:      opt_ctorpkg,
+				PackageVersion:   opt_ctorver,
+				TOIInterfaceName: opt_ctorifacename,
+				IncludeSource:    opt_ctorsrc,
 			})
 			if err != nil {
 				fmt.Println(err.Error())

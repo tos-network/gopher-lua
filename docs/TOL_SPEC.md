@@ -765,6 +765,7 @@ Implemented:
      `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
      `tolang -ctor` (directory or one-shot `.tol` input), `tolang -dtor`,
      `tolang -dtorj`, `tolang -vtor`, one-shot `-ctorpkg/-ctorver/-ctorsrc`,
+     one-shot `.toi` name override `-ctorifacename`,
      `.toi` name override `-ctoiname`, and `.toi` validator `-vtoi`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.

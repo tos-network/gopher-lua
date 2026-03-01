@@ -394,12 +394,13 @@ contract Demo {
 }
 `)
 	tor, err := CompileTOLToTOR(src, "demo.tol", &TORCompileOptions{
-		PackageName:    "demo",
-		PackageVersion: "1.2.3",
-		TOCPath:        "artifacts/Demo.toc",
-		TOIPath:        "abi/IDemo.toi",
-		IncludeSource:  true,
-		SourcePath:     "src/demo.tol",
+		PackageName:      "demo",
+		PackageVersion:   "1.2.3",
+		TOCPath:          "artifacts/Demo.toc",
+		TOIPath:          "abi/IDemo.toi",
+		TOIInterfaceName: "DemoIface",
+		IncludeSource:    true,
+		SourcePath:       "src/demo.tol",
 	})
 	if err != nil {
 		t.Fatalf("compile tor: %v", err)
@@ -413,6 +414,9 @@ contract Demo {
 	}
 	if _, ok := decoded.Files["abi/IDemo.toi"]; !ok {
 		t.Fatalf("missing custom toi path")
+	}
+	if !strings.Contains(string(decoded.Files["abi/IDemo.toi"]), "interface DemoIface {") {
+		t.Fatalf("expected custom toi interface name")
 	}
 	if _, ok := decoded.Files["src/demo.tol"]; !ok {
 		t.Fatalf("missing custom source path")
