@@ -36,10 +36,15 @@ tol verify trc20.toc
 tol verify --source trc20.tol trc20.toc
 ```
 
+- `tol version` and `tol --version` are equivalent.
+- `tol help <subcommand>` is supported (for example: `tol help compile`).
+- Legacy TOL flat flags are removed; only subcommand workflow is supported.
+
 ### Not landed yet
 
 - `.toi` import / type-check flow in the compiler
 - Registry resolution (`tor://...`, `toc://...`) and `tol install` / `tol publish`
+- `tor.lock` dependency pinning flow
 
 ---
 

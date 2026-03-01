@@ -24,7 +24,7 @@ Milestone progress snapshot:
 9. `M8` - Not started.
 10. `M9` - Not started.
 11. `M10` - Not started.
-12. `M-lib` - In progress (`.toc/.toi/.tor` core APIs landed; `tol compile/pack/inspect/verify` subcommands landed; registry install/publish pending).
+12. `M-lib` - In progress (artifact formats + `tol compile/pack/inspect/verify` subcommands landed; legacy TOL flat-flags removed; remaining: registry install/publish + lockfile/import resolution).
 13. `M-stdlib` - Not started (full OZ-equivalent standard library).
 14. `M-registry` - Not started (on-chain package registry).
 
@@ -83,7 +83,7 @@ Recent verifier hardening completed in this phase:
    - one-shot `.tol` -> `.tor` API path `CompileTOLToTOR` (minimal manifest + `.toc` + `.toi`)
    - CLI directory packaging: `tol pack -o out.tor ./dir/`
    - CLI one-shot packaging: `tol compile --emit tor -o out.tor input.tol`
-     with overrides `--package-name`, `--package-version`, `--interface-name`, `--include-source`
+     with overrides `--package-name`, `--package-version`, `--name`, `--include-source`
    - CLI TOR validation: `tol verify artifact.tor`
    - CLI TOR inspection: `tol inspect artifact.tor` / `tol inspect --json artifact.tor`
 

@@ -763,6 +763,8 @@ Implemented:
      `EncodeTOR`, `DecodeTOR`, `TORPackageHash`, `CompileTOLToTOR`
    - CLI: `tol compile` (emit `toc`/`toi`/`tor`), `tol inspect` (text/json),
      `tol verify` (with optional `--source`), `tol pack` (directory → `.tor`)
+     plus `tol version` / `tol --version` and `tol help <subcommand>`
+     (legacy TOL flat-flags removed)
      — see [TOL_PKG.md §7](TOL_PKG.md#7-cli-commands) for full reference
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
