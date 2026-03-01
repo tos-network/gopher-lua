@@ -761,7 +761,8 @@ Implemented:
      `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`,
      `EncodeTOR`, `DecodeTOR`, `TORPackageHash`
    - CLI: `tolang -ctol`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
-     `tolang -dtocj`, `tolang -vtoc`, and `tolang -vtoc -vtocsrc <source.tol>`
+     `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
+     `tolang -ctor`, `tolang -dtor`, and `tolang -dtorj`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
 10. `selector("sig")` literal calls are lowered as compile-time selector constants

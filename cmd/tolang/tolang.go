@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/fs"
+	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/chzyer/readline"
 	"github.com/tos-network/tolang"
@@ -19,14 +23,15 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc, opt_vtocsrc string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc bool
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc, opt_ctor, opt_vtocsrc string
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
 	flag.StringVar(&opt_c, "c", "", "")
 	flag.StringVar(&opt_ctol, "ctol", "", "")
 	flag.StringVar(&opt_ctoc, "ctoc", "", "")
+	flag.StringVar(&opt_ctor, "ctor", "", "")
 	flag.StringVar(&opt_vtocsrc, "vtocsrc", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
@@ -38,6 +43,8 @@ func mainAux() int {
 	flag.BoolVar(&opt_dtoc, "dtoc", false, "")
 	flag.BoolVar(&opt_dtocj, "dtocj", false, "")
 	flag.BoolVar(&opt_vtoc, "vtoc", false, "")
+	flag.BoolVar(&opt_dtor, "dtor", false, "")
+	flag.BoolVar(&opt_dtorj, "dtorj", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: tolang [options] [script [args]].
 	Available options are:
@@ -46,6 +53,7 @@ func mainAux() int {
 	  -c file  compile source script to bytecode file
 	  -ctol file  compile TOL source script to bytecode file (skeleton path)
 	  -ctoc file  compile TOL source script to .toc artifact file
+	  -ctor file  package a directory into .tor archive file
 	  -bc      treat input script as bytecode
 	  -dt      dump AST trees
 	  -dc      dump VM codes
@@ -53,6 +61,8 @@ func mainAux() int {
 	  -dtol    dump parsed TOL module
 	  -dtoc    dump parsed TOC artifact metadata
 	  -dtocj   dump parsed TOC artifact metadata as JSON
+	  -dtor    dump parsed TOR archive metadata
+	  -dtorj   dump parsed TOR archive metadata as JSON
 	  -vtoc    validate TOC artifact and return status
 	  -vtocsrc file  optional source file to verify TOC source_hash (use with -vtoc)
 	  -i       enter interactive mode after executing 'script'
@@ -72,12 +82,16 @@ func mainAux() int {
 	if len(opt_e) == 0 && !opt_i && !opt_v && flag.NArg() == 0 {
 		opt_i = true
 	}
-	if len(opt_c) > 0 && (len(opt_ctol) > 0 || len(opt_ctoc) > 0) {
-		fmt.Println("cannot use -c with -ctol/-ctoc together")
+	if len(opt_c) > 0 && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0) {
+		fmt.Println("cannot use -c with -ctol/-ctoc/-ctor together")
 		return 1
 	}
 	if len(opt_ctol) > 0 && len(opt_ctoc) > 0 {
 		fmt.Println("cannot use -ctol and -ctoc together")
+		return 1
+	}
+	if len(opt_ctor) > 0 && (len(opt_ctol) > 0 || len(opt_ctoc) > 0) {
+		fmt.Println("cannot use -ctor with -ctol/-ctoc together")
 		return 1
 	}
 	if len(opt_vtocsrc) > 0 && !opt_vtoc {
@@ -96,8 +110,12 @@ func mainAux() int {
 		fmt.Println("cannot use -dtoc and -dtocj together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -dtol, -dtoc, -dtocj, or -vtoc")
+	if opt_dtor && opt_dtorj {
+		fmt.Println("cannot use -dtor and -dtorj together")
+		return 1
+	}
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, or -dtorj")
 		return 1
 	}
 
@@ -180,6 +198,28 @@ func mainAux() int {
 			return 1
 		}
 		if err := os.WriteFile(opt_ctoc, toc, 0o644); err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		return 0
+	}
+	if len(opt_ctor) > 0 {
+		if flag.NArg() == 0 {
+			fmt.Println("TOR package mode requires an input directory")
+			return 1
+		}
+		root := flag.Arg(0)
+		manifest, files, err := collectTORPackageInputs(root)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		tor, err := lua.EncodeTOR(manifest, files)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		if err := os.WriteFile(opt_ctor, tor, 0o644); err != nil {
 			fmt.Println(err.Error())
 			return 1
 		}
@@ -289,6 +329,66 @@ func mainAux() int {
 				fmt.Println("TOC: ok")
 				return 0
 			}
+			if opt_dtor {
+				tor, err := lua.DecodeTOR(src)
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Printf("Manifest JSON: %s\n", string(tor.ManifestJSON))
+				fmt.Printf("Files: %d\n", len(tor.Files))
+				names := make([]string, 0, len(tor.Files))
+				for name := range tor.Files {
+					names = append(names, name)
+				}
+				sort.Strings(names)
+				for _, name := range names {
+					fmt.Printf(" - %s (%d bytes)\n", name, len(tor.Files[name]))
+				}
+				fmt.Printf("Package hash: %s\n", lua.TORPackageHash(src))
+				return 0
+			}
+			if opt_dtorj {
+				tor, err := lua.DecodeTOR(src)
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				type torFileInfo struct {
+					Path  string `json:"path"`
+					Bytes int    `json:"bytes"`
+				}
+				names := make([]string, 0, len(tor.Files))
+				for name := range tor.Files {
+					names = append(names, name)
+				}
+				sort.Strings(names)
+				infos := make([]torFileInfo, 0, len(names))
+				for _, name := range names {
+					infos = append(infos, torFileInfo{
+						Path:  name,
+						Bytes: len(tor.Files[name]),
+					})
+				}
+				out := struct {
+					ManifestJSON json.RawMessage `json:"manifest_json"`
+					FileCount    int             `json:"file_count"`
+					Files        []torFileInfo   `json:"files"`
+					PackageHash  string          `json:"package_hash"`
+				}{
+					ManifestJSON: json.RawMessage(tor.ManifestJSON),
+					FileCount:    len(tor.Files),
+					Files:        infos,
+					PackageHash:  lua.TORPackageHash(src),
+				}
+				b, err := json.MarshalIndent(out, "", "  ")
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Println(string(b))
+				return 0
+			}
 			if opt_dt || opt_dc || opt_di {
 				if opt_bc {
 					if opt_dt {
@@ -356,6 +456,41 @@ func mainAux() int {
 		doREPL(L)
 	}
 	return status
+}
+
+func collectTORPackageInputs(root string) ([]byte, map[string][]byte, error) {
+	var manifest []byte
+	files := map[string][]byte{}
+	if err := filepath.WalkDir(root, func(fullPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, fullPath)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		rel = strings.TrimSpace(rel)
+		body, err := os.ReadFile(fullPath)
+		if err != nil {
+			return err
+		}
+		if rel == "manifest.json" {
+			manifest = body
+			return nil
+		}
+		files[rel] = body
+		return nil
+	}); err != nil {
+		return nil, nil, err
+	}
+	if len(manifest) == 0 {
+		return nil, nil, fmt.Errorf("tor package directory must include manifest.json")
+	}
+	return manifest, files, nil
 }
 
 // do read/eval/print/loop

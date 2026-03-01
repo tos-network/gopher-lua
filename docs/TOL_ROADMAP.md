@@ -67,6 +67,8 @@ Recent verifier hardening completed in this phase:
      ABI/storage JSON validity)
    - deterministic `.tor` archive API (`EncodeTOR`/`DecodeTOR`/`TORPackageHash`)
      with canonical ordering and manifest/path validation
+   - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
+     and archive inspection
 
 ---
 

@@ -21,11 +21,14 @@ Currently landed in `tolang`:
   - `tolang -dtocj artifact.toc`
   - `tolang -vtoc artifact.toc`
   - `tolang -vtoc -vtocsrc source.tol artifact.toc`
+  - `tolang -ctor out.tor <package_dir>`
+  - `tolang -dtor artifact.tor`
+  - `tolang -dtorj artifact.tor`
 
 Not landed yet:
 
 - `.toi` compile/import flow
-- `.tor` CLI tooling (`-ctor`, `-dtor`) and high-level manifest builder
+- high-level TOR manifest builder command (`tol package ...`)
 - registry resolution (`tor://...`, `toc://...`)
 
 ---
