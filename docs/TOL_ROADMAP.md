@@ -25,6 +25,27 @@ Milestone progress snapshot:
 10. `M9` - Not started.
 11. `M10` - Not started.
 
+Recent verifier hardening completed in this phase:
+
+1. Selector/dispatch safety checks:
+   - `@selector` visibility + format + uniqueness checks
+   - `selector("sig")` literal-only, signature-form validation, and empty/malformed rejection
+   - selector builtin/member usage shape checks (`expr-only`, `emit`-payload rejection)
+2. Contract-scope call checks:
+   - local call arity checks for `fn(...)`, `this.fn(...)`, `Contract.fn(...)`
+   - contract member-call target existence + visibility checks
+3. Control-flow and statement checks:
+   - return-shape checks and structured-path non-void return coverage
+   - unreachable statement rejection after terminal flow
+   - assignment-expression placement rejection in value contexts
+4. Name and symbol checks:
+   - cross-namespace collisions (`event`/`fn`/`storage`)
+   - duplicate locals per lexical scope
+   - reserved name checks for contract/member identifiers (`this`, `selector`, `__tol_*`)
+5. Event and revert checks:
+   - declared-event resolution + arity checks for `emit`
+   - revert payload shape checks (empty or valid string literal)
+
 ---
 
 ## 1. Objective
