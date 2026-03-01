@@ -1284,6 +1284,25 @@ contract Demo {
 	}
 }
 
+func TestCompileTOLToBytecodeSelectorBuiltinRejectsMalformedLiteralArg(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn bad() public {
+    set sel = selector("transfer");
+    return;
+  }
+}
+`)
+	_, err := CompileTOLToBytecode(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected compile error")
+	}
+	if !strings.Contains(err.Error(), "TOL2012") {
+		t.Fatalf("expected TOL2012 error, got: %v", err)
+	}
+}
+
 func TestCompileTOLToBytecodeSelectorMemberThisAndContract(t *testing.T) {
 	src := []byte(`
 tol 0.2

@@ -102,7 +102,7 @@ Current parser/sema coverage in this branch:
    cannot be declared as contract name/member names),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
-   (`selector("sig")` non-empty literal-only, `this/Contract.fn.selector` target
+   (`selector("sig")` signature-form literal-only, `this/Contract.fn.selector` target
    existence + visibility).
 6. Lowering now builds a backend-neutral `lower.Program` skeleton
    (contract/storage/functions/constructor/fallback metadata) and lowers

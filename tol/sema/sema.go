@@ -599,7 +599,7 @@ func isStringLiteralExpr(e *ast.Expr) bool {
 	return err == nil
 }
 
-func isNonEmptyStringLiteralExpr(e *ast.Expr) bool {
+func isSelectorSignatureLiteralExpr(e *ast.Expr) bool {
 	root := stripParens(e)
 	if root == nil || root.Kind != "string" {
 		return false
@@ -608,7 +608,13 @@ func isNonEmptyStringLiteralExpr(e *ast.Expr) bool {
 	if err != nil {
 		return false
 	}
-	return strings.TrimSpace(v) != ""
+	sig := strings.TrimSpace(v)
+	if sig == "" {
+		return false
+	}
+	open := strings.Index(sig, "(")
+	close := strings.LastIndex(sig, ")")
+	return open > 0 && close == len(sig)-1 && open < close
 }
 
 func stripParens(e *ast.Expr) *ast.Expr {
@@ -1272,10 +1278,10 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 					Message: "selector(...) requires exactly one string literal argument",
 					Span:    defaultSpan(filename),
 				})
-			} else if !isNonEmptyStringLiteralExpr(e.Args[0]) {
+			} else if !isSelectorSignatureLiteralExpr(e.Args[0]) {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidSelectorExpr,
-					Message: "selector(...) requires a non-empty string literal signature",
+					Message: "selector(...) requires a string literal in signature form 'name(type1,type2,...)'",
 					Span:    defaultSpan(filename),
 				})
 			}
