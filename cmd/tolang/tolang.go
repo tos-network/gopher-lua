@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"strconv"
@@ -19,7 +20,7 @@ func main() {
 
 func mainAux() int {
 	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_vtoc bool
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
@@ -34,6 +35,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_bc, "bc", false, "")
 	flag.BoolVar(&opt_dtol, "dtol", false, "")
 	flag.BoolVar(&opt_dtoc, "dtoc", false, "")
+	flag.BoolVar(&opt_dtocj, "dtocj", false, "")
 	flag.BoolVar(&opt_vtoc, "vtoc", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: tolang [options] [script [args]].
@@ -49,6 +51,7 @@ func mainAux() int {
 	  -di      dump IR
 	  -dtol    dump parsed TOL module
 	  -dtoc    dump parsed TOC artifact metadata
+	  -dtocj   dump parsed TOC artifact metadata as JSON
 	  -vtoc    validate TOC artifact and return status
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
@@ -79,8 +82,16 @@ func mainAux() int {
 		fmt.Println("cannot use -dtoc and -vtoc together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || opt_dtol || opt_dtoc || opt_vtoc) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -dtol, -dtoc, or -vtoc")
+	if opt_dtocj && opt_vtoc {
+		fmt.Println("cannot use -dtocj and -vtoc together")
+		return 1
+	}
+	if opt_dtoc && opt_dtocj {
+		fmt.Println("cannot use -dtoc and -dtocj together")
+		return 1
+	}
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -dtol, -dtoc, -dtocj, or -vtoc")
 		return 1
 	}
 
@@ -213,6 +224,43 @@ func mainAux() int {
 				if len(toc.StorageLayoutJSON) > 0 {
 					fmt.Printf("Storage JSON: %s\n", string(toc.StorageLayoutJSON))
 				}
+				return 0
+			}
+			if opt_dtocj {
+				toc, err := lua.DecodeTOC(src)
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				out := struct {
+					Version       uint16          `json:"version"`
+					Compiler      string          `json:"compiler"`
+					ContractName  string          `json:"contract_name"`
+					BytecodeBytes int             `json:"bytecode_bytes"`
+					SourceHash    string          `json:"source_hash"`
+					BytecodeHash  string          `json:"bytecode_hash"`
+					ABIJSON       json.RawMessage `json:"abi_json,omitempty"`
+					StorageJSON   json.RawMessage `json:"storage_json,omitempty"`
+				}{
+					Version:       toc.Version,
+					Compiler:      toc.Compiler,
+					ContractName:  toc.ContractName,
+					BytecodeBytes: len(toc.Bytecode),
+					SourceHash:    toc.SourceHash,
+					BytecodeHash:  toc.BytecodeHash,
+				}
+				if len(toc.ABIJSON) > 0 {
+					out.ABIJSON = json.RawMessage(toc.ABIJSON)
+				}
+				if len(toc.StorageLayoutJSON) > 0 {
+					out.StorageJSON = json.RawMessage(toc.StorageLayoutJSON)
+				}
+				b, err := json.MarshalIndent(out, "", "  ")
+				if err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Println(string(b))
 				return 0
 			}
 			if opt_vtoc {

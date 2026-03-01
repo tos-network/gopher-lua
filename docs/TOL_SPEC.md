@@ -760,7 +760,7 @@ Implemented:
    - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOC`,
      `EncodeTOC`, `DecodeTOC`
    - CLI: `tolang -ctol`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
-     and `tolang -vtoc`
+     `tolang -dtocj`, and `tolang -vtoc`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
 10. `selector("sig")` literal calls are lowered as compile-time selector constants

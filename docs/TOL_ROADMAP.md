@@ -58,6 +58,7 @@ Recent verifier hardening completed in this phase:
    - compile path `CompileTOLToTOC` with ABI/storage metadata payloads
    - CLI output path `tolang -ctoc <out.toc> <input.tol>`
    - CLI metadata dump path `tolang -dtoc <artifact.toc>` (with embedded bytecode decode check)
+   - CLI JSON metadata dump path `tolang -dtocj <artifact.toc>`
    - CLI strict validation path `tolang -vtoc <artifact.toc>` (status-only check)
    - source/bytecode keccak256 hash embedding and roundtrip tests
    - decode-time strict validation (version/contract/bytecode presence,
