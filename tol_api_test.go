@@ -352,6 +352,23 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsEventFunctionNameCollision(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event Tick(a: u256)
+  fn Tick() public { return; }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected name collision error")
+	}
+	if !strings.Contains(err.Error(), "TOL2026") {
+		t.Fatalf("expected TOL2026 sema error, got: %v", err)
+	}
+}
+
 func TestCompileTOLToBytecodeOnInvokeDispatchesByDefaultSelector(t *testing.T) {
 	src := []byte(`
 tol 0.2

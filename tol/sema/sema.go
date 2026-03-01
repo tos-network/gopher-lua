@@ -125,6 +125,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 				}
 			}
 		}
+		diags = append(diags, checkContractNameCollisions(filename, slotInfos, funcArity, eventArity)...)
 
 		funcSeen := map[string]struct{}{}
 		selectorSeen := map[string]string{}
@@ -1045,6 +1046,36 @@ func functionVisibility(modifiers []string) string {
 		}
 	}
 	return vis
+}
+
+func checkContractNameCollisions(filename string, slots map[string]storageSlotInfo, funcs map[string]int, events map[string]int) diag.Diagnostics {
+	var out diag.Diagnostics
+	for name := range events {
+		if _, exists := funcs[name]; exists {
+			out = append(out, diag.Diagnostic{
+				Code:    diag.CodeSemaNameCollision,
+				Message: fmt.Sprintf("name collision: event '%s' conflicts with function '%s'", name, name),
+				Span:    defaultSpan(filename),
+			})
+		}
+		if _, exists := slots[name]; exists {
+			out = append(out, diag.Diagnostic{
+				Code:    diag.CodeSemaNameCollision,
+				Message: fmt.Sprintf("name collision: event '%s' conflicts with storage slot '%s'", name, name),
+				Span:    defaultSpan(filename),
+			})
+		}
+	}
+	for name := range funcs {
+		if _, exists := slots[name]; exists {
+			out = append(out, diag.Diagnostic{
+				Code:    diag.CodeSemaNameCollision,
+				Message: fmt.Sprintf("name collision: function '%s' conflicts with storage slot '%s'", name, name),
+				Span:    defaultSpan(filename),
+			})
+		}
+	}
+	return out
 }
 
 func validateFunctionModifiers(filename string, fnName string, modifiers []string) (string, diag.Diagnostics) {

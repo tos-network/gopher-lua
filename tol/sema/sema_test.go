@@ -1512,6 +1512,52 @@ func TestCheckAllowsEmitWhenNoEventsDeclared(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsEventFunctionNameCollision(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Events: []ast.EventDecl{
+				{Name: "Tick", Params: []ast.FieldDecl{{Name: "a", Type: "u256"}}},
+			},
+			Functions: []ast.FunctionDecl{
+				{Name: "Tick"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2026") {
+		t.Fatalf("expected TOL2026, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsFunctionStorageNameCollision(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Storage: &ast.StorageDecl{
+				Slots: []ast.StorageSlot{
+					{Name: "run", Type: "u256"},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{Name: "run"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2026") {
+		t.Fatalf("expected TOL2026, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsRevertNonStringPayload(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
