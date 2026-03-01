@@ -24,6 +24,14 @@ func mainAux() int {
 	if handled, status := dispatchSubcommand(os.Args[1:]); handled {
 		return status
 	}
+	if removed, hint, ok := detectRemovedTOLFlag(os.Args[1:]); ok {
+		if hint != "" {
+			fmt.Printf("legacy TOL flag %s is removed; use %s\n", removed, hint)
+		} else {
+			fmt.Printf("legacy TOL flag %s is removed; use subcommands (tol compile|pack|inspect|verify)\n", removed)
+		}
+		return 1
+	}
 
 	var opt_e, opt_l, opt_p, opt_c string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc bool
@@ -229,6 +237,43 @@ func collectTORPackageInputs(root string) ([]byte, map[string][]byte, error) {
 		return nil, nil, fmt.Errorf("tor package directory must include manifest.json")
 	}
 	return manifest, files, nil
+}
+
+func detectRemovedTOLFlag(args []string) (removed string, hint string, ok bool) {
+	removedHints := map[string]string{
+		"-ctol":          "tol compile -o <out.toc> <input.tol>",
+		"-ctoi":          "tol compile --emit toi -o <out.toi> <input.tol>",
+		"-ctoiname":      "tol compile --emit toi --name <Name> -o <out.toi> <input.tol>",
+		"-ctoc":          "tol compile -o <out.toc> <input.tol>",
+		"-ctor":          "tol compile --emit tor -o <out.tor> <input.tol>  or  tol pack -o <out.tor> <dir>",
+		"-ctorpkg":       "tol compile --emit tor --package-name <name> ...",
+		"-ctorver":       "tol compile --emit tor --package-version <version> ...",
+		"-ctorifacename": "tol compile --emit tor --name <Interface> ...",
+		"-ctorsrc":       "tol compile --emit tor --include-source ...",
+		"-dtol":          "tol compile --ast <input.tol>",
+		"-dtoi":          "tol inspect <artifact.toi>",
+		"-dtoc":          "tol inspect <artifact.toc>",
+		"-dtocj":         "tol inspect --json <artifact.toc>",
+		"-dtor":          "tol inspect <artifact.tor>",
+		"-dtorj":         "tol inspect --json <artifact.tor>",
+		"-vtoc":          "tol verify <artifact.toc>",
+		"-vtocsrc":       "tol verify --source <source.tol> <artifact.toc>",
+		"-vtor":          "tol verify <artifact.tor>",
+		"-vtoi":          "tol verify <artifact.toi>",
+	}
+	for _, raw := range args {
+		a := strings.TrimSpace(raw)
+		if !strings.HasPrefix(a, "-") {
+			continue
+		}
+		if i := strings.Index(a, "="); i >= 0 {
+			a = a[:i]
+		}
+		if hint, exists := removedHints[a]; exists {
+			return a, hint, true
+		}
+	}
+	return "", "", false
 }
 
 // do read/eval/print/loop
