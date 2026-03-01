@@ -650,9 +650,9 @@ func (p *Parser) parseStatement() (ast.Statement, bool) {
 		}
 		return ast.Statement{Kind: "continue"}, true
 	case lexer.TokenKwRequire:
-		return p.parseUnaryCallLikeStatement("require", lexer.TokenKwRequire)
+		return p.parseRequireAssertStatement("require", lexer.TokenKwRequire)
 	case lexer.TokenKwAssert:
-		return p.parseUnaryCallLikeStatement("assert", lexer.TokenKwAssert)
+		return p.parseRequireAssertStatement("assert", lexer.TokenKwAssert)
 	case lexer.TokenKwRevert:
 		return p.parseUnaryCallLikeStatement("revert", lexer.TokenKwRevert)
 	case lexer.TokenKwEmit:
@@ -778,6 +778,41 @@ func (p *Parser) parseUnaryCallLikeStatement(kind string, kw lexer.Type) (ast.St
 		Kind: kind,
 		Expr: expr,
 	}, true
+}
+
+// parseRequireAssertStatement parses: require(cond, "msg"); or assert(cond, "msg");
+// The condition expression is stored in Stmt.Expr; the message string in Stmt.Text.
+func (p *Parser) parseRequireAssertStatement(kind string, kw lexer.Type) (ast.Statement, bool) {
+	if !p.expect(kw, diag.CodeParseUnexpected, "expected '"+kind+"'") {
+		return ast.Statement{}, false
+	}
+	if !p.expect(lexer.TokenLParen, diag.CodeParseUnexpected, "expected '(' after '"+kind+"'") {
+		return ast.Statement{}, false
+	}
+	cond, ok := p.parseExpression(map[lexer.Type]bool{lexer.TokenComma: true})
+	if !ok {
+		return ast.Statement{}, false
+	}
+	if !p.expect(lexer.TokenComma, diag.CodeParseUnexpected, "expected ',' between "+kind+" condition and message") {
+		return ast.Statement{}, false
+	}
+	if p.cur.Type != lexer.TokenString {
+		p.addDiag(diag.Diagnostic{
+			Code:    diag.CodeParseUnexpected,
+			Message: "expected string literal as " + kind + " message",
+			Span:    p.span(p.cur),
+		})
+		return ast.Statement{}, false
+	}
+	msg := p.cur.Literal
+	p.next()
+	if !p.expect(lexer.TokenRParen, diag.CodeParseUnexpected, "expected ')' after "+kind+" message") {
+		return ast.Statement{}, false
+	}
+	if !p.expect(lexer.TokenSemicolon, diag.CodeParseUnexpected, "expected ';' after "+kind+" statement") {
+		return ast.Statement{}, false
+	}
+	return ast.Statement{Kind: kind, Expr: cond, Text: msg}, true
 }
 
 func (p *Parser) parseExprSemicolonStmt() (ast.Statement, bool) {

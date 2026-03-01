@@ -1323,6 +1323,102 @@ func TestCheckAcceptsFunctionCallArityMatch(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsThisMemberFunctionCallArityMismatch(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "sum",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "b", Type: "u256"},
+					},
+					Body: []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "sum",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "this",
+									},
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2019") {
+		t.Fatalf("expected TOL2019, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsContractMemberFunctionCallArityMismatch(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "sum",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "b", Type: "u256"},
+					},
+					Body: []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "sum",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "Demo",
+									},
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2019") {
+		t.Fatalf("expected TOL2019, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsInvalidAssignmentExprTarget(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

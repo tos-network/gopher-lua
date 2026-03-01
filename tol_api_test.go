@@ -240,6 +240,26 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsThisMemberFunctionCallArityMismatch(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn sum(a: u256, b: u256) public { return; }
+  fn run() public {
+    this.sum(1);
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected arity error")
+	}
+	if !strings.Contains(err.Error(), "TOL2019") {
+		t.Fatalf("expected TOL2019 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsNonCallAssignExprStatement(t *testing.T) {
 	src := []byte(`
 tol 0.2

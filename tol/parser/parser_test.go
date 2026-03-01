@@ -25,7 +25,7 @@ contract Demo {}
 func TestParseContractSubset(t *testing.T) {
 	src := []byte(`
 tol 0.2
-interface IERC20 { fn transfer(to: address, amount: u256) public; }
+interface ITRC20 { fn transfer(to: address, amount: u256) public; }
 library MathX { fn dummy() { } }
 contract Demo {
   storage {

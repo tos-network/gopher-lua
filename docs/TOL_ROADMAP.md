@@ -319,7 +319,7 @@ Goals:
 Deliverables:
 
 1. CTMM conformance suite:
-   - ERC20 behavior subset
+   - TRC20 behavior subset
    - factory and deployment flow coverage
    - event and ABI checks
 2. Differential tests:

@@ -13,6 +13,7 @@ func OpenBase(L *LState) int {
 	L.SetGlobal("_GOPHER_LUA_VERSION", LString(PackageName+" "+PackageVersion))
 	basemod := L.RegisterModule("_G", baseFuncs)
 	openMapping(L)
+	openCrypto(L)
 	global.RawSetString("ipairs", L.NewClosure(baseIpairs, L.NewFunction(ipairsaux)))
 	global.RawSetString("pairs", L.NewClosure(basePairs, L.NewFunction(pairsaux)))
 	L.Push(basemod)

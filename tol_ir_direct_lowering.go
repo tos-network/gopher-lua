@@ -124,6 +124,16 @@ type storageSlotInfo struct {
 	kind         storageSlotKind
 	typ          string
 	mappingDepth int
+	baseSlotHash string // compile-time keccak256("tol.slot.<Contract>.<name>")
+	luaConstName string // "__tol_s_<name>" - Lua local constant name
+}
+
+// computeBaseSlotHash returns the canonical base slot hash for a named storage
+// slot per TOL spec §8.3: keccak256("tol.slot.<contractName>.<slotName>").
+func computeBaseSlotHash(contractName, slotName string) string {
+	h := sha3.NewLegacyKeccak256()
+	_, _ = h.Write([]byte("tol.slot." + contractName + "." + slotName))
+	return "0x" + hex.EncodeToString(h.Sum(nil))
 }
 
 func buildLoweringEnv(contractName string, dispatchFns []dispatchFunc, storageSlots []lower.StorageSlot) (*loweringEnv, error) {
@@ -146,6 +156,8 @@ func buildLoweringEnv(contractName string, dispatchFns []dispatchFunc, storageSl
 			kind:         kind,
 			typ:          strings.TrimSpace(slot.Type),
 			mappingDepth: mappingTypeDepth(slot.Type),
+			baseSlotHash: computeBaseSlotHash(contractName, name),
+			luaConstName: "__tol_s_" + name,
 		}
 	}
 	return &loweringEnv{
@@ -187,94 +199,58 @@ func buildStoragePreludeFromLowered(env *loweringEnv) ([]luast.Stmt, error) {
 	sort.Strings(names)
 
 	var sb strings.Builder
-	sb.WriteString("__tol_storage = __tol_storage or {}\n")
-	sb.WriteString("__tol_storage_meta = __tol_storage_meta or {}\n")
+
+	// Emit compile-time base slot hash constants (spec §8.3).
+	// Each named slot gets a local constant holding its canonical keccak256 hash.
 	for _, name := range names {
 		info := env.storageByName[name]
-		sb.WriteString(fmt.Sprintf("__tol_storage_meta[%q] = %q\n", name, string(info.kind)))
+		sb.WriteString(fmt.Sprintf("local %s = %q\n", info.luaConstName, info.baseSlotHash))
 	}
-	sb.WriteString(`
-function __tol_sload(slot, ...)
-  local meta = __tol_storage_meta[slot]
-  local node = __tol_storage[slot]
-  local keys = {...}
-  if node == nil then
-    if meta == "mapping" then
-      node = {}
-      __tol_storage[slot] = node
-    elseif meta == "array" then
-      node = { __len = 0 }
-      __tol_storage[slot] = node
-    else
-      return 0
-    end
-  end
-  if #keys == 0 then
-    return node
-  end
-  local cur = node
-  for i = 1, #keys do
-    local k = keys[i]
-    local v = cur[k]
-    if v == nil then
-      return 0
-    end
-    if i == #keys then
-      return v
-    end
-    cur = v
-  end
-  return 0
+
+	// Flat storage table: storage[bytes32_hex] = value.
+	// All key derivation is done before the load/store call.
+	sb.WriteString(`__tol_storage = __tol_storage or {}
+
+-- Read a slot by its final derived hash key.
+function __tol_sload(slot_hash)
+  local v = __tol_storage[slot_hash]
+  if v == nil then return 0 end
+  return v
 end
 
-function __tol_sstore(slot, value, ...)
-  local meta = __tol_storage_meta[slot]
-  local keys = {...}
-  if #keys == 0 then
-    __tol_storage[slot] = value
-    return value
-  end
-  local node = __tol_storage[slot]
-  if node == nil then
-    node = {}
-    if meta == "array" then
-      node.__len = 0
-    end
-    __tol_storage[slot] = node
-  end
-  local cur = node
-  for i = 1, #keys - 1 do
-    local k = keys[i]
-    local nxt = cur[k]
-    if nxt == nil then
-      nxt = {}
-      cur[k] = nxt
-    end
-    cur = nxt
-  end
-  local leaf = keys[#keys]
-  cur[leaf] = value
+-- Write a slot by its final derived hash key.
+function __tol_sstore(slot_hash, value)
+  __tol_storage[slot_hash] = value
   return value
 end
 
-function __tol_spush(slot, value)
-  local arr = __tol_storage[slot]
-  if arr == nil then
-    arr = { __len = 0 }
-    __tol_storage[slot] = arr
-  end
-  local n = arr.__len or 0
-  arr[n] = value
-  arr.__len = n + 1
-  return arr.__len
+-- Derive a mapping slot key: keccak256(encode(key) ++ base_hash).
+-- Matches spec §8.3: h_n = H(encode(k_n) ++ h_{n-1}).
+function __tol_mkey(key, base)
+  local base_hex = base:sub(3)       -- strip leading "0x"
+  local key_hex  = __tol_enc(key)    -- 64 hex chars, no 0x prefix
+  return keccak256("0x" .. key_hex .. base_hex)
 end
 
-function __tol_slen(slot)
-  local arr = __tol_storage[slot]
-  if arr == nil then
-    return 0
-  end
-  return arr.__len or 0
+-- Compute element slot for a storage array: H(base_slot) + index.
+-- Matches spec §8.4: element i at keccak256(base_slot) + i.
+function __tol_arr_elem(base, idx)
+  local data_base = keccak256(base)  -- H(base): hash the 32-byte base slot
+  return uint256_add_hex(data_base, idx)
+end
+
+-- Read array length (stored at the base slot itself).
+function __tol_slen(base)
+  return __tol_sload(base)
+end
+
+-- Push a value onto a storage dynamic array.
+function __tol_spush(base, value)
+  local n = __tol_slen(base)
+  local elem_slot = __tol_arr_elem(base, n)
+  __tol_sstore(elem_slot, value)
+  __tol_sstore(base, n + 1)
+  return n + 1
 end
 `)
 	chunk, err := parse.Parse(bytes.NewReader([]byte(sb.String())), "<tol-storage-prelude>")
@@ -852,12 +828,60 @@ func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 		return withLineStmt(&luast.DoBlockStmt{Stmts: block}), nil
 	case "expr":
 		return tolExprStmtToLua(ctx, stmt.Expr)
-	case "emit", "require", "assert", "revert":
-		// Lower these to host-visible calls in the current bootstrap stage.
-		fnName := stmt.Kind
-		if stmt.Kind == "revert" {
-			fnName = "error"
+	case "emit":
+		// emit EventName(arg1, arg2, ...) → emit("EventName", arg1, arg2, ...)
+		// The runtime must provide an emit() host function.
+		args := []luast.Expr{}
+		if stmt.Expr != nil && stmt.Expr.Kind == "call" && stmt.Expr.Callee != nil {
+			// First arg: event name as string literal.
+			eventName := ""
+			if stmt.Expr.Callee.Kind == "ident" {
+				eventName = stmt.Expr.Callee.Value
+			}
+			args = append(args, withLineExpr(&luast.StringExpr{Value: eventName}))
+			for _, a := range stmt.Expr.Args {
+				ex, err := tolExprToLua(ctx, a)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, ex)
+			}
+		} else if stmt.Expr != nil {
+			ex, err := tolExprToLua(ctx, stmt.Expr)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, ex)
 		}
+		call := withLineExpr(&luast.FuncCallExpr{
+			Func:      withLineExpr(&luast.IdentExpr{Value: "emit"}),
+			Args:      args,
+			AdjustRet: true,
+		})
+		return withLineStmt(&luast.FuncCallStmt{Expr: call}), nil
+	case "require", "assert":
+		// require(cond, "msg") → assert(cond, "msg")
+		// assert(cond, "msg") → assert(cond, "msg")
+		// Lua's assert(v, msg) raises an error with msg if v is falsy.
+		args := []luast.Expr{}
+		if stmt.Expr != nil {
+			ex, err := tolExprToLua(ctx, stmt.Expr)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, ex)
+		}
+		if stmt.Text != "" {
+			args = append(args, withLineExpr(&luast.StringExpr{Value: unquoteIfNeeded(stmt.Text)}))
+		}
+		call := withLineExpr(&luast.FuncCallExpr{
+			Func:      withLineExpr(&luast.IdentExpr{Value: "assert"}),
+			Args:      args,
+			AdjustRet: true,
+		})
+		return withLineStmt(&luast.FuncCallStmt{Expr: call}), nil
+	case "revert":
+		// revert "msg" → error("msg")
 		args := []luast.Expr{}
 		if stmt.Expr != nil {
 			ex, err := tolExprToLua(ctx, stmt.Expr)
@@ -867,7 +891,7 @@ func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 			args = append(args, ex)
 		}
 		call := withLineExpr(&luast.FuncCallExpr{
-			Func:      withLineExpr(&luast.IdentExpr{Value: fnName}),
+			Func:      withLineExpr(&luast.IdentExpr{Value: "error"}),
 			Args:      args,
 			AdjustRet: true,
 		})
@@ -1121,6 +1145,50 @@ func lowerSelectorMemberExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, bool
 	return withLineExpr(&luast.StringExpr{Value: sel}), true, nil
 }
 
+// buildHashSlotExpr builds the final Lua expression for a storage slot access.
+// For scalars: the compile-time constant ident (__tol_s_<name>).
+// For mappings: a chain of __tol_mkey calls, one per key in order.
+// For arrays with an index: __tol_arr_elem(base, idx).
+func buildHashSlotExpr(ctx *loweringCtx, info storageSlotInfo, keys []*tolast.Expr) (luast.Expr, error) {
+	base := luast.Expr(withLineExpr(&luast.IdentExpr{Value: info.luaConstName}))
+	switch info.kind {
+	case storageKindScalar:
+		return base, nil
+	case storageKindMapping:
+		// Build: __tol_mkey(k_n, __tol_mkey(k_{n-1}, ... __tol_mkey(k_1, base)))
+		cur := base
+		for _, k := range keys {
+			kExpr, err := tolExprToLua(ctx, k)
+			if err != nil {
+				return nil, err
+			}
+			cur = withLineExpr(&luast.FuncCallExpr{
+				Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_mkey"}),
+				Args:      []luast.Expr{kExpr, cur},
+				AdjustRet: true,
+			})
+		}
+		return cur, nil
+	case storageKindArray:
+		if len(keys) == 0 {
+			// Base slot holds the array length; return it directly.
+			return base, nil
+		}
+		// arr[i] → __tol_arr_elem(base, i)
+		idxExpr, err := tolExprToLua(ctx, keys[0])
+		if err != nil {
+			return nil, err
+		}
+		return withLineExpr(&luast.FuncCallExpr{
+			Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_arr_elem"}),
+			Args:      []luast.Expr{base, idxExpr},
+			AdjustRet: true,
+		}), nil
+	default:
+		return nil, fmt.Errorf("[%s] unsupported storage slot kind for '%s'", diag.CodeLowerUnsupportedFeature, info.name)
+	}
+}
+
 func lowerStorageStoreStmt(ctx *loweringCtx, target *tolast.Expr, valueExpr *tolast.Expr) (luast.Stmt, bool, error) {
 	slotName, keys, ok := ctx.storagePathFromExpr(target)
 	if !ok {
@@ -1134,17 +1202,13 @@ func lowerStorageStoreStmt(ctx *loweringCtx, target *tolast.Expr, valueExpr *tol
 	if err != nil {
 		return nil, true, err
 	}
-	args := make([]luast.Expr, 0, 2+len(keys))
-	args = append(args, withLineExpr(&luast.StringExpr{Value: slotName}))
-	args = append(args, value)
-	keyExprs, err := lowerStorageKeyExprs(ctx, keys)
+	slotExpr, err := buildHashSlotExpr(ctx, info, keys)
 	if err != nil {
 		return nil, true, err
 	}
-	args = append(args, keyExprs...)
 	call := withLineExpr(&luast.FuncCallExpr{
 		Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_sstore"}),
-		Args:      args,
+		Args:      []luast.Expr{slotExpr, value},
 		AdjustRet: true,
 	})
 	return withLineStmt(&luast.FuncCallStmt{Expr: call}), true, nil
@@ -1155,16 +1219,13 @@ func lowerStorageLoadExpr(ctx *loweringCtx, slotName string, keys []*tolast.Expr
 	if err := validateStorageKeyShape(info, keys, "read"); err != nil {
 		return nil, err
 	}
-	args := make([]luast.Expr, 0, 1+len(keys))
-	args = append(args, withLineExpr(&luast.StringExpr{Value: slotName}))
-	keyExprs, err := lowerStorageKeyExprs(ctx, keys)
+	slotExpr, err := buildHashSlotExpr(ctx, info, keys)
 	if err != nil {
 		return nil, err
 	}
-	args = append(args, keyExprs...)
 	return withLineExpr(&luast.FuncCallExpr{
 		Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_sload"}),
-		Args:      args,
+		Args:      []luast.Expr{slotExpr},
 		AdjustRet: true,
 	}), nil
 }
@@ -1182,10 +1243,8 @@ func lowerStorageLengthMemberExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr,
 		return nil, true, fmt.Errorf("[%s] '.length' is supported only for top-level storage arrays in current stage", diag.CodeLowerUnsupportedFeature)
 	}
 	return withLineExpr(&luast.FuncCallExpr{
-		Func: withLineExpr(&luast.IdentExpr{Value: "__tol_slen"}),
-		Args: []luast.Expr{
-			withLineExpr(&luast.StringExpr{Value: slotName}),
-		},
+		Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_slen"}),
+		Args:      []luast.Expr{withLineExpr(&luast.IdentExpr{Value: info.luaConstName})},
 		AdjustRet: true,
 	}), true, nil
 }
@@ -1212,26 +1271,11 @@ func lowerStoragePushCallExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, boo
 	return withLineExpr(&luast.FuncCallExpr{
 		Func: withLineExpr(&luast.IdentExpr{Value: "__tol_spush"}),
 		Args: []luast.Expr{
-			withLineExpr(&luast.StringExpr{Value: slotName}),
+			withLineExpr(&luast.IdentExpr{Value: info.luaConstName}),
 			val,
 		},
 		AdjustRet: true,
 	}), true, nil
-}
-
-func lowerStorageKeyExprs(ctx *loweringCtx, keys []*tolast.Expr) ([]luast.Expr, error) {
-	if len(keys) == 0 {
-		return []luast.Expr{}, nil
-	}
-	out := make([]luast.Expr, 0, len(keys))
-	for _, k := range keys {
-		ex, err := tolExprToLua(ctx, k)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, ex)
-	}
-	return out, nil
 }
 
 func validateStorageKeyShape(info storageSlotInfo, keys []*tolast.Expr, action string) error {

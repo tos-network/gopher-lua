@@ -73,7 +73,8 @@ Current parser/sema coverage in this branch:
    storage-access shape checks for implemented subset
    (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints,
    including `.length` read-only target checks),
-   contract-local function call arity checks, assignment-expression target checks,
+   contract-local function call arity checks
+   (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`), assignment-expression target checks,
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    assignment-expression placement checks (value-context rejection),
    non-void function return-path checks for current structured subset

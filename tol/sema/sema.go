@@ -1158,11 +1158,11 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 				})
 			}
 		}
-		if e.Callee != nil && e.Callee.Kind == "ident" {
-			if want, ok := funcArity[e.Callee.Value]; ok && len(e.Args) != want {
+		if name, ok := localContractCallName(contractName, e.Callee); ok {
+			if want, exists := funcArity[name]; exists && len(e.Args) != want {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaCallArity,
-					Message: fmt.Sprintf("function '%s' expects %d argument(s), got %d", e.Callee.Value, want, len(e.Args)),
+					Message: fmt.Sprintf("function '%s' expects %d argument(s), got %d", name, want, len(e.Args)),
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -1228,6 +1228,31 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 		checkExpr(contractName, funcVis, funcArity, filename, e.Left, diags)
 	default:
 		// leaf nodes
+	}
+}
+
+func localContractCallName(contractName string, callee *ast.Expr) (string, bool) {
+	root := stripParens(callee)
+	if root == nil {
+		return "", false
+	}
+	switch root.Kind {
+	case "ident":
+		name := strings.TrimSpace(root.Value)
+		return name, name != ""
+	case "member":
+		obj := stripParens(root.Object)
+		if obj == nil || obj.Kind != "ident" {
+			return "", false
+		}
+		scope := strings.TrimSpace(obj.Value)
+		if scope != "this" && scope != contractName {
+			return "", false
+		}
+		name := strings.TrimSpace(root.Member)
+		return name, name != ""
+	default:
+		return "", false
 	}
 }
 

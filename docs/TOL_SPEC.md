@@ -91,7 +91,7 @@ support declarations (`interface`, `library`, `enum`, `modifier`).
 ```tol
 tol 0.2
 
-contract ERC20 {
+contract TRC20 {
   storage {
     slot name: bytes;
     slot symbol: bytes;
@@ -663,12 +663,12 @@ CallExpr        = PrimaryExpr "(" ExprList? ")" ;
 
 ---
 
-## 19. ERC20 Example (TOL Sketch)
+## 19. TRC20 Example (TOL Sketch)
 
 ```tol
 tol 0.2
 
-contract ERC20 {
+contract TRC20 {
   storage {
     slot name: bytes;
     slot symbol: bytes;
@@ -773,7 +773,8 @@ Implemented:
 14. Early semantic verifier validates storage-access shape for implemented subset:
     mapping key-depth arity, scalar non-indexability, and array-only `.length`/`.push(v)`
     on top-level storage arrays (`.length` is read-only).
-15. Early semantic verifier validates local contract-call arity and assignment-expression
+15. Early semantic verifier validates local contract-call arity
+    (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`) and assignment-expression
     target assignability in expression context.
     Assignment targets using literal identifiers (`true`/`false`/`nil`) are rejected.
 16. Early semantic verifier restricts assignment-expression placement to supported
@@ -855,9 +856,9 @@ Mandatory language/runtime coverage to claim full support:
 3. Deployment builtins (`new`, `create2`) without inline assembly:
    needed by `Create2CloneFactory.sol`, `FPMMDeterministicFactory.sol`.
 4. Inheritance/interfaces/modifiers/abstract signatures:
-   needed across `ERC20.sol`, `MarketMaker.sol`, factory contracts.
+   needed across `TRC20.sol`, `MarketMaker.sol`, factory contracts.
 5. ABI high-level operations (`decode`, `encodeWithSignature`, selectors, tuple decode):
-   needed by clone constructor payload flows and ERC1155 selector handling.
+   needed by clone constructor payload flows and TRC1155 selector handling.
 6. Deterministic integer `log/exp` intrinsics (`binaryLog`, `pow2`, rounding modes, scale semantics):
    needed by `LMSRMarketMaker.sol`.
 
