@@ -104,7 +104,7 @@ Current parser/sema coverage in this branch:
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` signature-form literal-only with non-empty arg entries,
    `this/Contract.fn.selector` target
-   existence + visibility).
+   existence + visibility, and selector-value non-callability).
 6. Lowering now builds a backend-neutral `lower.Program` skeleton
    (contract/storage/functions/constructor/fallback metadata) and lowers
    directly to VM IR in the compiler backend (no Lua transpile stage in the

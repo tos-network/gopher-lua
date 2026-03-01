@@ -1307,6 +1307,13 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 	}
 	switch e.Kind {
 	case "call":
+		if isSelectorBuiltinCallExpr(e.Callee) || isSelectorMemberExpr(e.Callee) {
+			*diags = append(*diags, diag.Diagnostic{
+				Code:    diag.CodeSemaSelectorTarget,
+				Message: "selector expression result is bytes4 and cannot be called as a function",
+				Span:    defaultSpan(filename),
+			})
+		}
 		callee := stripParens(e.Callee)
 		if callee != nil && callee.Kind == "ident" && strings.TrimSpace(callee.Value) == "selector" {
 			if len(e.Args) != 1 || e.Args[0] == nil || e.Args[0].Kind != "string" {
