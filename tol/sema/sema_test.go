@@ -1886,6 +1886,44 @@ func TestCheckRejectsContractTopLevelNameCollision(t *testing.T) {
 	}
 }
 
+func TestCheckDuplicateFunctionDoesNotCascadeDuplicateSelectorNoise(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Modifiers: []string{"public"},
+					Body:      []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Modifiers: []string{"public"},
+					Body:      []ast.Statement{{Kind: "return"}},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	msg := diags.Error()
+	if !strings.Contains(msg, "TOL2004") {
+		t.Fatalf("expected duplicate function error, got: %v", diags)
+	}
+	if strings.Contains(msg, "TOL2011") {
+		t.Fatalf("unexpected duplicate selector noise for duplicate function: %v", diags)
+	}
+}
+
 func TestCheckRejectsReservedTopLevelSupportDeclName(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
