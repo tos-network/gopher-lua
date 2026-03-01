@@ -229,6 +229,30 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
+		case "require", "assert":
+			if s.Expr == nil {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidStmtShape,
+					Message: s.Kind + " statement requires an expression argument in current stage",
+					Span:    defaultSpan(filename),
+				})
+			}
+		case "revert":
+			if s.Expr != nil && !isStringLiteralExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidRevert,
+					Message: "revert payload must be a string literal in current stage",
+					Span:    defaultSpan(filename),
+				})
+			}
+		case "emit":
+			if s.Expr == nil || !isCallExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidStmtShape,
+					Message: "emit statement requires a call-like payload (e.g. emit EventName(...))",
+					Span:    defaultSpan(filename),
+				})
+			}
 		case "set":
 			if !isAssignableTarget(s.Target) {
 				*diags = append(*diags, diag.Diagnostic{
@@ -334,6 +358,16 @@ func isExprStatementExpr(e *ast.Expr) bool {
 		return isExprStatementExpr(e.Left)
 	}
 	return false
+}
+
+func isCallExpr(e *ast.Expr) bool {
+	root := stripParens(e)
+	return root != nil && root.Kind == "call"
+}
+
+func isStringLiteralExpr(e *ast.Expr) bool {
+	root := stripParens(e)
+	return root != nil && root.Kind == "string"
 }
 
 func stripParens(e *ast.Expr) *ast.Expr {

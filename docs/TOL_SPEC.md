@@ -778,6 +778,9 @@ Implemented:
     statement contexts (expression statement / `for` post), rejecting value-context use.
 17. Non-void functions require at least one explicit value-return statement in
     current verifier stage (conservative return-shape enforcement).
+18. Statement-shape checks enforce current subset contracts:
+    `require/assert` must carry expression payload; `emit` must carry call-like payload.
+19. `revert` payload is constrained to empty or string-literal form in current stage.
 
 Partially implemented:
 

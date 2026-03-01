@@ -75,6 +75,8 @@ Current parser/sema coverage in this branch:
    contract-local function call arity checks, assignment-expression target checks,
    assignment-expression placement checks (value-context rejection),
    non-void function value-return presence checks (current conservative rule),
+   statement-shape checks for current subset (`require/assert` payload, `emit` call payload),
+   `revert` payload shape checks (empty or string literal in current stage),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target

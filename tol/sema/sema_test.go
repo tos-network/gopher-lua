@@ -1094,6 +1094,156 @@ func TestCheckAcceptsCallExprStatementAndForPostAssign(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsRequireWithoutExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{Kind: "require"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsEmitNonCallExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind:  "ident",
+								Value: "x",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsEmitCallExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "Tick",
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestCheckRejectsRevertNonStringPayload(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "revert",
+							Expr: &ast.Expr{
+								Kind:  "ident",
+								Value: "err",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2022") {
+		t.Fatalf("expected TOL2022, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsRevertStringOrEmpty(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "a",
+					Body: []ast.Statement{
+						{Kind: "revert"},
+					},
+				},
+				{
+					Name: "b",
+					Body: []ast.Statement{
+						{
+							Kind: "revert",
+							Expr: &ast.Expr{
+								Kind:  "string",
+								Value: "\"ERR\"",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsNestedAssignInExprStatementCallArg(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
