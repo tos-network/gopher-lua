@@ -891,6 +891,25 @@ See [TOL_AUDIT.md](TOL_AUDIT.md) for the full security architecture:
 eliminated vulnerability classes, language-level enforcements, verifier invariants,
 and auditor reference.
 
+---
+
+## 24. Built-in Testing Framework
+
+TOL ships testing as a first-class language feature, not an external framework.
+
+Key design points:
+
+- Test files use the `*_test.tol` suffix and are never compiled into production artifacts.
+- A `test <Name> { }` block declares a test suite with `setup`, `teardown`, and
+  `fn test_*` functions.
+- `deploy <Contract>(args...) -> binding` instantiates a contract with isolated storage.
+- `with msg.sender = <addr> { }` overrides call context for a block.
+- Built-in assertions: `assert_eq`, `assert_ne`, `assert_revert`, `assert_event`.
+- `inspect <instance>.<slot>` reads storage directly (white-box testing, test-only).
+- `tol test -cover` reports function, branch, and storage-slot coverage.
+
+See [TOL_TEST.md](TOL_TEST.md) for the full specification.
+
 Current status on 2026-03-01:
 
 1. This conformance criterion is not yet met.
