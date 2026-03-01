@@ -614,7 +614,41 @@ func isSelectorSignatureLiteralExpr(e *ast.Expr) bool {
 	}
 	open := strings.Index(sig, "(")
 	close := strings.LastIndex(sig, ")")
-	return open > 0 && close == len(sig)-1 && open < close
+	if !(open > 0 && close == len(sig)-1 && open < close) {
+		return false
+	}
+	name := strings.TrimSpace(sig[:open])
+	if !isValidSelectorFunctionName(name) {
+		return false
+	}
+	args := strings.TrimSpace(sig[open+1 : close])
+	if args == "" {
+		return true
+	}
+	for _, p := range strings.Split(args, ",") {
+		if strings.TrimSpace(p) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func isValidSelectorFunctionName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		if i == 0 {
+			if !(r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')) {
+				return false
+			}
+			continue
+		}
+		if !(r == '_' || (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+	return true
 }
 
 func stripParens(e *ast.Expr) *ast.Expr {
