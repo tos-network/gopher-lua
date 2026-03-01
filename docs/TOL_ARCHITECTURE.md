@@ -85,6 +85,7 @@ Current parser/sema coverage in this branch:
    duplicate event-name checks,
    cross-namespace identifier collision checks (`event`/`fn`/`storage`),
    duplicate-name checks for event params and function return-name lists,
+   function parameter/return-field name collision checks,
    lexical-scope duplicate local declaration checks (`let`),
    selector-override visibility checks (`@selector` only on public/external),
    `@selector("0x........")` format/uniqueness checks for

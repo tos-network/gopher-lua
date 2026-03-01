@@ -1652,6 +1652,63 @@ func TestCheckRejectsDuplicateFunctionReturnNames(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsFunctionParamReturnNameCollision(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Returns: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2029") {
+		t.Fatalf("expected TOL2029, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsFunctionDistinctParamAndReturnNames(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Returns: []ast.FieldDecl{
+						{Name: "out", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

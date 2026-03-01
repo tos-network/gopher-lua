@@ -406,6 +406,24 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsFunctionParamReturnNameCollision(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn f(x: u256) -> (x: u256) public {
+    return 1;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected param/return collision error")
+	}
+	if !strings.Contains(err.Error(), "TOL2029") {
+		t.Fatalf("expected TOL2029 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
 	src := []byte(`
 tol 0.2

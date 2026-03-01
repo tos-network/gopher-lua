@@ -133,6 +133,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		for _, fn := range m.Contract.Functions {
 			diags = append(diags, duplicateParamDiagnostics(filename, "function", fn.Name, fn.Params)...)
 			diags = append(diags, duplicateParamDiagnostics(filename, "returns", fn.Name, fn.Returns)...)
+			diags = append(diags, checkParamReturnNameCollisions(filename, fn.Name, fn.Params, fn.Returns)...)
 			if _, ok := funcSeen[fn.Name]; ok {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaDuplicateFunction,
@@ -1345,6 +1346,35 @@ func duplicateParamDiagnostics(filename, ownerKind, ownerName string, params []a
 			continue
 		}
 		seen[name] = struct{}{}
+	}
+	return out
+}
+
+func checkParamReturnNameCollisions(filename, fnName string, params, returns []ast.FieldDecl) diag.Diagnostics {
+	var out diag.Diagnostics
+	if len(params) == 0 || len(returns) == 0 {
+		return out
+	}
+	paramNames := map[string]struct{}{}
+	for _, p := range params {
+		name := strings.TrimSpace(p.Name)
+		if name == "" {
+			continue
+		}
+		paramNames[name] = struct{}{}
+	}
+	for _, r := range returns {
+		name := strings.TrimSpace(r.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := paramNames[name]; ok {
+			out = append(out, diag.Diagnostic{
+				Code:    diag.CodeSemaParamReturnCollision,
+				Message: fmt.Sprintf("function '%s' has name collision between parameter and return field '%s'", fnName, name),
+				Span:    defaultSpan(filename),
+			})
+		}
 	}
 	return out
 }
