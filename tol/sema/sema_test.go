@@ -793,6 +793,38 @@ func TestCheckRejectsReservedContractName(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsReservedContractNameSelector(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "selector",
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsReservedContractNamePrefixTol(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "__tol_demo",
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsConflictingVisibilityModifiers(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

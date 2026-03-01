@@ -298,6 +298,34 @@ contract this {}
 	}
 }
 
+func TestBuildIRFromTOLRejectsReservedContractNameSelector(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract selector {}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected reserved-name error")
+	}
+	if !strings.Contains(err.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsReservedContractNamePrefixTol(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract __tol_demo {}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected reserved-name error")
+	}
+	if !strings.Contains(err.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsDuplicateFnVisibilityModifier(t *testing.T) {
 	src := []byte(`
 tol 0.2
