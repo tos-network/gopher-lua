@@ -1167,6 +1167,15 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 				})
 			}
 		}
+		if name, ok := scopedContractMemberCallName(contractName, e.Callee); ok {
+			if _, exists := funcArity[name]; !exists {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaUnknownCallTarget,
+					Message: fmt.Sprintf("contract call target function '%s' not found", name),
+					Span:    defaultSpan(filename),
+				})
+			}
+		}
 		checkExpr(contractName, funcVis, funcArity, filename, e.Callee, diags)
 		for _, a := range e.Args {
 			checkExpr(contractName, funcVis, funcArity, filename, a, diags)
@@ -1254,6 +1263,23 @@ func localContractCallName(contractName string, callee *ast.Expr) (string, bool)
 	default:
 		return "", false
 	}
+}
+
+func scopedContractMemberCallName(contractName string, callee *ast.Expr) (string, bool) {
+	root := stripParens(callee)
+	if root == nil || root.Kind != "member" {
+		return "", false
+	}
+	obj := stripParens(root.Object)
+	if obj == nil || obj.Kind != "ident" {
+		return "", false
+	}
+	scope := strings.TrimSpace(obj.Value)
+	if scope != "this" && scope != contractName {
+		return "", false
+	}
+	name := strings.TrimSpace(root.Member)
+	return name, name != ""
 }
 
 func functionVisibility(modifiers []string) string {

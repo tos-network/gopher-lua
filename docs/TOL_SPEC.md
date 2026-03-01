@@ -797,6 +797,8 @@ Implemented:
     (same-scope duplicates rejected; nested-scope shadowing allowed).
 27. Unreachable statements are rejected after terminal control-flow
     (`return`, `revert`, loop-body `break/continue`, or `if/else` where both branches terminate).
+28. Contract-scoped member calls (`this.fn(...)`, `Contract.fn(...)`) must
+    resolve to declared contract functions.
 
 Partially implemented:
 

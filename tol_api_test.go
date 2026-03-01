@@ -260,6 +260,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsUnknownThisMemberFunctionCallTarget(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    this.missing();
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unknown call target error")
+	}
+	if !strings.Contains(err.Error(), "TOL2031") {
+		t.Fatalf("expected TOL2031 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsNonCallAssignExprStatement(t *testing.T) {
 	src := []byte(`
 tol 0.2

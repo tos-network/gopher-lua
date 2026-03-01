@@ -75,6 +75,7 @@ Current parser/sema coverage in this branch:
    including `.length` read-only target checks),
    contract-local function call arity checks
    (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`), assignment-expression target checks,
+   contract-scoped member-call target resolution checks,
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    assignment-expression placement checks (value-context rejection),
    non-void function return-path checks for current structured subset

@@ -1419,6 +1419,80 @@ func TestCheckRejectsContractMemberFunctionCallArityMismatch(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsUnknownThisMemberFunctionCallTarget(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "missing",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "this",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2031") {
+		t.Fatalf("expected TOL2031, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsUnknownContractMemberFunctionCallTarget(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "missing",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "Demo",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2031") {
+		t.Fatalf("expected TOL2031, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsInvalidAssignmentExprTarget(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

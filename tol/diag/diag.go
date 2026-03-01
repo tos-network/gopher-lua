@@ -35,6 +35,7 @@ const (
 	CodeSemaDuplicateLocal       = "TOL2028"
 	CodeSemaParamReturnCollision = "TOL2029"
 	CodeSemaUnreachableStmt      = "TOL2030"
+	CodeSemaUnknownCallTarget    = "TOL2031"
 	CodeLowerNotImplemented      = "TOL3001"
 	CodeLowerUnsupportedFeature  = "TOL3002"
 	CodeCodegenNotImplemented    = "TOL4001"
