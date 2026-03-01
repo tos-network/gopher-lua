@@ -527,6 +527,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsAssertMissingMessageArg(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    assert(true);
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected parse error")
+	}
+	if !strings.Contains(err.Error(), "TOL1001") {
+		t.Fatalf("expected TOL1001 parse error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsRevertNonStringPayload(t *testing.T) {
 	src := []byte(`
 tol 0.2

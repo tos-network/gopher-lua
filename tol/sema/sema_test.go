@@ -1979,6 +1979,7 @@ func TestCheckRejectsAssignExprInRequireExpr(t *testing.T) {
 					Body: []ast.Statement{
 						{
 							Kind: "require",
+							Text: "\"BAD\"",
 							Expr: &ast.Expr{
 								Kind: "assign",
 								Op:   "=",
@@ -2014,6 +2015,7 @@ func TestCheckRejectsAssignExprInAssertExpr(t *testing.T) {
 					Body: []ast.Statement{
 						{
 							Kind: "assert",
+							Text: "\"BAD\"",
 							Expr: &ast.Expr{
 								Kind: "assign",
 								Op:   "=",
@@ -2035,6 +2037,60 @@ func TestCheckRejectsAssignExprInAssertExpr(t *testing.T) {
 	}
 	if !strings.Contains(diags.Error(), "TOL2020") {
 		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsRequireMissingMessage(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "require",
+							Expr: &ast.Expr{Kind: "ident", Value: "ok"},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsAssertMissingMessage(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "assert",
+							Expr: &ast.Expr{Kind: "ident", Value: "ok"},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
 	}
 }
 

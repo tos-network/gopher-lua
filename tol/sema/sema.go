@@ -268,6 +268,13 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Message: s.Kind + " statement requires an expression argument in current stage",
 					Span:    defaultSpan(filename),
 				})
+			}
+			if strings.TrimSpace(s.Text) == "" {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidStmtShape,
+					Message: s.Kind + " statement requires a string message argument in current stage",
+					Span:    defaultSpan(filename),
+				})
 			} else if containsAssignExpr(s.Expr) {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidAssignExpr,
