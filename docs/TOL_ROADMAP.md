@@ -31,6 +31,8 @@ Recent verifier hardening completed in this phase:
    - `@selector` visibility + format + uniqueness checks
    - `selector("sig")` literal-only, signature-form validation, and empty/malformed rejection
    - selector builtin/member usage shape checks (`expr-only`, `emit`-payload rejection)
+   - selector expression results are non-callable (`selector("...")(...)` / `*.selector(...)` rejected)
+   - parenthesized selector-member forms are normalized (`(this.fn).selector`, `(Contract.fn).selector`)
 2. Contract-scope call checks:
    - local call arity checks for `fn(...)`, `this.fn(...)`, `Contract.fn(...)`
    - contract member-call target existence + visibility checks
