@@ -23,6 +23,7 @@ const (
 	CodeSemaDuplicateParam      = "TOL2016"
 	CodeSemaInvalidReturn       = "TOL2017"
 	CodeSemaStorageAccess       = "TOL2018"
+	CodeSemaCallArity           = "TOL2019"
 	CodeLowerNotImplemented     = "TOL3001"
 	CodeLowerUnsupportedFeature = "TOL3002"
 	CodeCodegenNotImplemented   = "TOL4001"

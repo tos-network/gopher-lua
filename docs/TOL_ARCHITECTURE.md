@@ -71,6 +71,7 @@ Current parser/sema coverage in this branch:
    (void/non-void/constructor/fallback),
    storage-access shape checks for implemented subset
    (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints),
+   contract-local function call arity checks, assignment-expression target checks,
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target

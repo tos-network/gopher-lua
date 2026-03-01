@@ -705,3 +705,133 @@ func TestCheckAcceptsStorageArrayPushLengthAndIndex(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 }
+
+func TestCheckRejectsFunctionCallArityMismatch(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "sum",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "b", Type: "u256"},
+					},
+					Body: []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind:   "call",
+								Callee: &ast.Expr{Kind: "ident", Value: "sum"},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2019") {
+		t.Fatalf("expected TOL2019, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsFunctionCallArityMatch(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "sum",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "b", Type: "u256"},
+					},
+					Body: []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind:   "call",
+								Callee: &ast.Expr{Kind: "ident", Value: "sum"},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+									{Kind: "number", Value: "2"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestCheckRejectsInvalidAssignmentExprTarget(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "for",
+							Init: &ast.Statement{
+								Kind: "let",
+								Name: "i",
+								Type: "u256",
+								Expr: &ast.Expr{Kind: "number", Value: "0"},
+							},
+							Cond: &ast.Expr{
+								Kind:  "binary",
+								Op:    "<",
+								Left:  &ast.Expr{Kind: "ident", Value: "i"},
+								Right: &ast.Expr{Kind: "number", Value: "3"},
+							},
+							Post: &ast.Expr{
+								Kind: "assign",
+								Op:   "=",
+								Left: &ast.Expr{
+									Kind:  "binary",
+									Op:    "+",
+									Left:  &ast.Expr{Kind: "ident", Value: "i"},
+									Right: &ast.Expr{Kind: "number", Value: "1"},
+								},
+								Right: &ast.Expr{Kind: "number", Value: "1"},
+							},
+							Body: []ast.Statement{{Kind: "break"}},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2008") {
+		t.Fatalf("expected TOL2008, got: %v", diags)
+	}
+}

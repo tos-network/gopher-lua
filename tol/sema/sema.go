@@ -79,10 +79,12 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 
 	if m.Contract != nil {
 		funcVis := map[string]string{}
+		funcArity := map[string]int{}
 		for _, fn := range m.Contract.Functions {
 			vis, modDiags := validateFunctionModifiers(filename, fn.Name, fn.Modifiers)
 			diags = append(diags, modDiags...)
 			funcVis[fn.Name] = vis
+			funcArity[fn.Name] = len(fn.Params)
 		}
 		slotInfos := map[string]storageSlotInfo{}
 
@@ -153,19 +155,19 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 					selectorSeen[key] = fn.Name
 				}
 			}
-			checkStatements(filename, m.Contract.Name, funcVis, fn.Body, 0, &diags)
+			checkStatements(filename, m.Contract.Name, funcVis, funcArity, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, fn.Params, fn.Body, &diags)
 		}
 
 		if m.Contract.Constructor != nil {
 			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
-			checkStatements(filename, m.Contract.Name, funcVis, m.Contract.Constructor.Body, 0, &diags)
+			checkStatements(filename, m.Contract.Name, funcVis, funcArity, m.Contract.Constructor.Body, 0, &diags)
 			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 		}
 		if m.Contract.Fallback != nil {
-			checkStatements(filename, m.Contract.Name, funcVis, m.Contract.Fallback.Body, 0, &diags)
+			checkStatements(filename, m.Contract.Name, funcVis, funcArity, m.Contract.Fallback.Body, 0, &diags)
 			checkReturnStatements(filename, "fallback", "", false, m.Contract.Fallback.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, nil, m.Contract.Fallback.Body, &diags)
 		}
@@ -177,14 +179,14 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 	return &TypedModule{AST: m}, nil
 }
 
-func checkStatements(filename string, contractName string, funcVis map[string]string, stmts []ast.Statement, loopDepth int, diags *diag.Diagnostics) {
+func checkStatements(filename string, contractName string, funcVis map[string]string, funcArity map[string]int, stmts []ast.Statement, loopDepth int, diags *diag.Diagnostics) {
 	for _, s := range stmts {
-		checkExpr(contractName, funcVis, filename, s.Expr, diags)
-		checkExpr(contractName, funcVis, filename, s.Target, diags)
-		checkExpr(contractName, funcVis, filename, s.Cond, diags)
-		checkExpr(contractName, funcVis, filename, s.Post, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, s.Expr, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, s.Target, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, s.Cond, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, s.Post, diags)
 		if s.Init != nil {
-			checkStatements(filename, contractName, funcVis, []ast.Statement{*s.Init}, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, []ast.Statement{*s.Init}, loopDepth, diags)
 		}
 		switch s.Kind {
 		case "break":
@@ -219,8 +221,8 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
-			checkStatements(filename, contractName, funcVis, s.Then, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, s.Else, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Then, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Else, loopDepth, diags)
 		case "while":
 			if s.Cond == nil {
 				*diags = append(*diags, diag.Diagnostic{
@@ -229,13 +231,13 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
-			checkStatements(filename, contractName, funcVis, s.Body, loopDepth+1, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth+1, diags)
 		case "for":
-			checkStatements(filename, contractName, funcVis, s.Body, loopDepth+1, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth+1, diags)
 		default:
-			checkStatements(filename, contractName, funcVis, s.Then, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, s.Else, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, s.Body, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Then, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Else, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth, diags)
 		}
 	}
 }
@@ -637,7 +639,7 @@ func isAssignableTarget(e *ast.Expr) bool {
 	}
 }
 
-func checkExpr(contractName string, funcVis map[string]string, filename string, e *ast.Expr, diags *diag.Diagnostics) {
+func checkExpr(contractName string, funcVis map[string]string, funcArity map[string]int, filename string, e *ast.Expr, diags *diag.Diagnostics) {
 	if e == nil {
 		return
 	}
@@ -652,9 +654,18 @@ func checkExpr(contractName string, funcVis map[string]string, filename string, 
 				})
 			}
 		}
-		checkExpr(contractName, funcVis, filename, e.Callee, diags)
+		if e.Callee != nil && e.Callee.Kind == "ident" {
+			if want, ok := funcArity[e.Callee.Value]; ok && len(e.Args) != want {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaCallArity,
+					Message: fmt.Sprintf("function '%s' expects %d argument(s), got %d", e.Callee.Value, want, len(e.Args)),
+					Span:    defaultSpan(filename),
+				})
+			}
+		}
+		checkExpr(contractName, funcVis, funcArity, filename, e.Callee, diags)
 		for _, a := range e.Args {
-			checkExpr(contractName, funcVis, filename, a, diags)
+			checkExpr(contractName, funcVis, funcArity, filename, a, diags)
 		}
 	case "member":
 		// Validate selector member builtin: this.fn.selector / Contract.fn.selector
@@ -684,17 +695,27 @@ func checkExpr(contractName string, funcVis map[string]string, filename string, 
 				})
 			}
 		}
-		checkExpr(contractName, funcVis, filename, e.Object, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Object, diags)
 	case "index":
-		checkExpr(contractName, funcVis, filename, e.Object, diags)
-		checkExpr(contractName, funcVis, filename, e.Index, diags)
-	case "binary", "assign":
-		checkExpr(contractName, funcVis, filename, e.Left, diags)
-		checkExpr(contractName, funcVis, filename, e.Right, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Object, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Index, diags)
+	case "binary":
+		checkExpr(contractName, funcVis, funcArity, filename, e.Left, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Right, diags)
+	case "assign":
+		if !isAssignableTarget(e.Left) {
+			*diags = append(*diags, diag.Diagnostic{
+				Code:    diag.CodeSemaInvalidSetTarget,
+				Message: "assignment target must be identifier, member access, or index access",
+				Span:    defaultSpan(filename),
+			})
+		}
+		checkExpr(contractName, funcVis, funcArity, filename, e.Left, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Right, diags)
 	case "unary":
-		checkExpr(contractName, funcVis, filename, e.Right, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Right, diags)
 	case "paren":
-		checkExpr(contractName, funcVis, filename, e.Left, diags)
+		checkExpr(contractName, funcVis, funcArity, filename, e.Left, diags)
 	default:
 		// leaf nodes
 	}

@@ -771,6 +771,8 @@ Implemented:
 14. Early semantic verifier validates storage-access shape for implemented subset:
     mapping key-depth arity, scalar non-indexability, and array-only `.length`/`.push(v)`
     on top-level storage arrays.
+15. Early semantic verifier validates local contract-call arity and assignment-expression
+    target assignability in expression context.
 
 Partially implemented:
 
