@@ -275,11 +275,16 @@ func validateTORManifest(manifestJSON []byte, files map[string][]byte, verifyRef
 		return fmt.Errorf("tor manifest requires non-empty 'version'")
 	}
 	if verifyRefs {
+		seenContracts := map[string]struct{}{}
 		for _, c := range m.Contracts {
 			cname := strings.TrimSpace(c.Name)
 			if cname == "" {
 				return fmt.Errorf("tor manifest contracts entry requires non-empty 'name'")
 			}
+			if _, exists := seenContracts[cname]; exists {
+				return fmt.Errorf("tor manifest has duplicate contract name %q", cname)
+			}
+			seenContracts[cname] = struct{}{}
 			hasTOC := strings.TrimSpace(c.TOC) != ""
 			hasTOI := strings.TrimSpace(c.TOI) != ""
 			if !hasTOC && !hasTOI {

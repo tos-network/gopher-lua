@@ -129,6 +129,16 @@ func TestEncodeTORRejectsManifestContractMissingTOCAndTOI(t *testing.T) {
 	}
 }
 
+func TestEncodeTORRejectsDuplicateManifestContractNames(t *testing.T) {
+	manifest := []byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toc":"bytecode/Demo.toc"},{"name":"Demo","toi":"interfaces/IDemo.toi"}]}`)
+	if _, err := EncodeTOR(manifest, map[string][]byte{
+		"bytecode/Demo.toc":    mustCompileTOCTestArtifact(t),
+		"interfaces/IDemo.toi": mustCompileTOITestArtifact(t),
+	}); err == nil {
+		t.Fatalf("expected duplicate contract name error")
+	}
+}
+
 func TestEncodeTORRejectsMissingManifestReferencedTOI(t *testing.T) {
 	manifest := []byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toi":"interfaces/IDemo.toi"}]}`)
 	if _, err := EncodeTOR(manifest, map[string][]byte{
@@ -225,6 +235,38 @@ func TestDecodeTORRejectsManifestContractMissingTOCAndTOI(t *testing.T) {
 	}
 	if _, err := DecodeTOR(buf.Bytes()); err == nil {
 		t.Fatalf("expected missing toc/toi reference error")
+	}
+}
+
+func TestDecodeTORRejectsDuplicateManifestContractNames(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	mw, err := zw.Create("manifest.json")
+	if err != nil {
+		t.Fatalf("create manifest entry: %v", err)
+	}
+	if _, err := mw.Write([]byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toc":"bytecode/Demo.toc"},{"name":"Demo","toi":"interfaces/IDemo.toi"}]}`)); err != nil {
+		t.Fatalf("write manifest entry: %v", err)
+	}
+	tw, err := zw.Create("bytecode/Demo.toc")
+	if err != nil {
+		t.Fatalf("create toc entry: %v", err)
+	}
+	if _, err := tw.Write(mustCompileTOCTestArtifact(t)); err != nil {
+		t.Fatalf("write toc entry: %v", err)
+	}
+	iw, err := zw.Create("interfaces/IDemo.toi")
+	if err != nil {
+		t.Fatalf("create toi entry: %v", err)
+	}
+	if _, err := iw.Write(mustCompileTOITestArtifact(t)); err != nil {
+		t.Fatalf("write toi entry: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+	if _, err := DecodeTOR(buf.Bytes()); err == nil {
+		t.Fatalf("expected duplicate contract name error")
 	}
 }
 

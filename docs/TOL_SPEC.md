@@ -835,6 +835,7 @@ Implemented:
     path-safety validation, manifest JSON validation (`name`/`version` required),
     package hash helper, manifest contract checks
     (`contracts[*].name` required and at least one of `toc`/`toi`),
+    manifest contract-name uniqueness checks,
     manifest reference existence checks (`contracts[*].toc/.toi`),
     and decode-time `.toc` entry integrity validation.
 33. `.toi` textual interface generation baseline is available:

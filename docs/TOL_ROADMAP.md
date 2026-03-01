@@ -76,6 +76,7 @@ Recent verifier hardening completed in this phase:
      with canonical ordering and manifest/path validation
      (`manifest.name`/`manifest.version` required)
      and per-contract manifest checks (`contracts[*].name`, `toc|toi`)
+     plus per-contract-name uniqueness checks
      plus manifest contract-reference file existence checks
      and decode-time `.toc`/`.toi` entry verification
    - one-shot `.tol` -> `.tor` API path `CompileTOLToTOR` (minimal manifest + `.toc` + `.toi`)

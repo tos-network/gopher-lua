@@ -17,6 +17,7 @@ Scope: File formats, package layout, standard library, and on-chain registry
 - `EncodeTOC(...)` / `DecodeTOC(...)` / `VerifyTOCSourceHash(toc, sourceBytes)`
 - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
   (`contracts[*].name` and at least one of `toc`/`toi` are required;
+  contract names must be unique;
   `DecodeTOR` validates embedded `.toc`/`.toi` entries)
 
 ### CLI (current — flat-flag style, to be migrated)
