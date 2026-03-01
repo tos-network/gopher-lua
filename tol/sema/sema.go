@@ -614,12 +614,19 @@ func isSelectorSignatureLiteralExpr(e *ast.Expr) bool {
 	if sig == "" {
 		return false
 	}
+	if v != sig {
+		return false
+	}
 	open := strings.Index(sig, "(")
 	close := strings.LastIndex(sig, ")")
 	if !(open > 0 && close == len(sig)-1 && open < close) {
 		return false
 	}
-	name := strings.TrimSpace(sig[:open])
+	rawName := sig[:open]
+	name := strings.TrimSpace(rawName)
+	if rawName != name {
+		return false
+	}
 	if !isValidSelectorFunctionName(name) {
 		return false
 	}

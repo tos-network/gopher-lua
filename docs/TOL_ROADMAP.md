@@ -33,7 +33,8 @@ Recent verifier hardening completed in this phase:
 1. Selector/dispatch safety checks:
    - `@selector` visibility + format + uniqueness checks
    - `selector("sig")` literal-only, signature-form validation, and empty/malformed rejection
-   - selector literal arg list enforces canonical no-whitespace token form
+   - selector literal enforces canonical spacing (no surrounding whitespace,
+     no whitespace before `(`, and no-whitespace arg tokens)
    - selector builtin/member usage shape checks (`expr-only`, `emit`-payload rejection)
    - selector expression results are non-callable (`selector("...")(...)` / `*.selector(...)` rejected)
    - parenthesized selector-member forms are normalized (`(this.fn).selector`, `(Contract.fn).selector`)

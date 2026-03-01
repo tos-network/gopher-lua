@@ -833,7 +833,8 @@ Partially implemented:
 6. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
    signed arithmetic/cast verifier semantics are not yet complete.
 7. `selector("sig")` currently requires a string literal in signature form
-   (`name(type1,type2,...)`, no empty arg entries, canonical no-whitespace arg tokens)
+   (`name(type1,type2,...)`, no empty arg entries, canonical no-whitespace arg tokens,
+   no leading/trailing whitespace, and no whitespace before `(`)
    in direct IR mode;
    dynamic selector expressions are not implemented.
 8. Selector member builtins currently work only for externally dispatchable

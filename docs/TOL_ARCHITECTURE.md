@@ -104,6 +104,7 @@ Current parser/sema coverage in this branch:
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` signature-form literal-only with non-empty canonical arg entries,
+   no leading/trailing whitespace, and no whitespace before `(`,
    `this/Contract.fn.selector` target
    existence + visibility, and selector-value non-callability).
 6. Lowering now builds a backend-neutral `lower.Program` skeleton
