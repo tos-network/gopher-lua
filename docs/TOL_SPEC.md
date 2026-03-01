@@ -827,7 +827,7 @@ Partially implemented:
    but still need deeper verifier checks for corner-case control flow.
 6. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
    signed arithmetic/cast verifier semantics are not yet complete.
-7. `selector("sig")` currently requires a string literal argument in direct IR mode;
+7. `selector("sig")` currently requires a non-empty string literal argument in direct IR mode;
    dynamic selector expressions are not implemented.
 8. Selector member builtins currently work only for externally dispatchable
    targets in current stage.
