@@ -84,6 +84,24 @@ func TestEncodeTORRejectsPathEscape(t *testing.T) {
 	}
 }
 
+func TestEncodeTORRejectsMissingManifestReferencedTOC(t *testing.T) {
+	manifest := []byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toc":"bytecode/Demo.toc"}]}`)
+	if _, err := EncodeTOR(manifest, map[string][]byte{
+		"interfaces/IDemo.toi": []byte("i"),
+	}); err == nil {
+		t.Fatalf("expected missing manifest referenced toc error")
+	}
+}
+
+func TestEncodeTORRejectsMissingManifestReferencedTOI(t *testing.T) {
+	manifest := []byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toi":"interfaces/IDemo.toi"}]}`)
+	if _, err := EncodeTOR(manifest, map[string][]byte{
+		"bytecode/Demo.toc": mustCompileTOCTestArtifact(t),
+	}); err == nil {
+		t.Fatalf("expected missing manifest referenced toi error")
+	}
+}
+
 func TestDecodeTORRejectsMissingManifest(t *testing.T) {
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -135,6 +153,24 @@ func TestDecodeTORRejectsManifestMissingRequiredFields(t *testing.T) {
 	}
 	if _, err := DecodeTOR(buf.Bytes()); err == nil {
 		t.Fatalf("expected missing version error")
+	}
+}
+
+func TestDecodeTORRejectsManifestReferencedMissingFile(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	mw, err := zw.Create("manifest.json")
+	if err != nil {
+		t.Fatalf("create manifest entry: %v", err)
+	}
+	if _, err := mw.Write([]byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toc":"bytecode/Demo.toc"}]}`)); err != nil {
+		t.Fatalf("write manifest entry: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+	if _, err := DecodeTOR(buf.Bytes()); err == nil {
+		t.Fatalf("expected manifest referenced missing file error")
 	}
 }
 

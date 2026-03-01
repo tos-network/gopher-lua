@@ -44,10 +44,6 @@ func TORPackageHash(data []byte) string {
 
 // EncodeTOR serializes manifest + files into deterministic .tor bytes.
 func EncodeTOR(manifestJSON []byte, files map[string][]byte) ([]byte, error) {
-	if err := validateTORManifest(manifestJSON); err != nil {
-		return nil, err
-	}
-
 	cleanFiles := map[string][]byte{}
 	for name, body := range files {
 		clean, err := normalizeTORPath(name)
@@ -60,6 +56,9 @@ func EncodeTOR(manifestJSON []byte, files map[string][]byte) ([]byte, error) {
 		b := make([]byte, len(body))
 		copy(b, body)
 		cleanFiles[clean] = b
+	}
+	if err := validateTORManifest(manifestJSON, cleanFiles, true); err != nil {
+		return nil, err
 	}
 
 	var names []string
@@ -127,7 +126,7 @@ func DecodeTOR(data []byte) (*TORArtifact, error) {
 	if len(manifest) == 0 {
 		return nil, fmt.Errorf("tor manifest.json not found")
 	}
-	if err := validateTORManifest(manifest); err != nil {
+	if err := validateTORManifest(manifest, files, true); err != nil {
 		return nil, err
 	}
 	for name, body := range files {
@@ -143,13 +142,18 @@ func DecodeTOR(data []byte) (*TORArtifact, error) {
 	}, nil
 }
 
-func validateTORManifest(manifestJSON []byte) error {
+func validateTORManifest(manifestJSON []byte, files map[string][]byte, verifyRefs bool) error {
 	if !json.Valid(manifestJSON) {
 		return fmt.Errorf("tor manifest is not valid json")
 	}
 	var m struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
+		Name      string `json:"name"`
+		Version   string `json:"version"`
+		Contracts []struct {
+			Name string `json:"name"`
+			TOC  string `json:"toc"`
+			TOI  string `json:"toi"`
+		} `json:"contracts"`
 	}
 	if err := json.Unmarshal(manifestJSON, &m); err != nil {
 		return fmt.Errorf("tor manifest decode error: %w", err)
@@ -159,6 +163,28 @@ func validateTORManifest(manifestJSON []byte) error {
 	}
 	if strings.TrimSpace(m.Version) == "" {
 		return fmt.Errorf("tor manifest requires non-empty 'version'")
+	}
+	if verifyRefs {
+		for _, c := range m.Contracts {
+			if p := strings.TrimSpace(c.TOC); p != "" {
+				np, err := normalizeTORPath(p)
+				if err != nil {
+					return fmt.Errorf("tor manifest contract %q has invalid toc path %q: %w", c.Name, p, err)
+				}
+				if _, ok := files[np]; !ok {
+					return fmt.Errorf("tor manifest contract %q references missing toc file %q", c.Name, np)
+				}
+			}
+			if p := strings.TrimSpace(c.TOI); p != "" {
+				np, err := normalizeTORPath(p)
+				if err != nil {
+					return fmt.Errorf("tor manifest contract %q has invalid toi path %q: %w", c.Name, p, err)
+				}
+				if _, ok := files[np]; !ok {
+					return fmt.Errorf("tor manifest contract %q references missing toi file %q", c.Name, np)
+				}
+			}
+		}
 	}
 	return nil
 }

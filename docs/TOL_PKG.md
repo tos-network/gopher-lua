@@ -17,7 +17,8 @@ Currently landed in `tolang`:
   - `VerifyTOCSourceHash(toc, sourceBytes)`
   - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
     (`manifest.name` and `manifest.version` are required)
-    and `.toc` entries are decode-validated during `DecodeTOR`
+    and `contracts[*].toc/.toi` references must exist in archive entries;
+    `.toc` entries are decode-validated during `DecodeTOR`
 - CLI:
   - `tolang -ctoi out.toi input.tol`
   - `tolang -ctoc out.toc input.tol`

@@ -830,7 +830,8 @@ Implemented:
     deterministic ZIP(`store`) encoding with canonical ordering
     (`manifest.json` first, then lexicographically sorted entries),
     path-safety validation, manifest JSON validation (`name`/`version` required),
-    package hash helper, and decode-time `.toc` entry integrity validation.
+    package hash helper, manifest reference existence checks (`contracts[*].toc/.toi`),
+    and decode-time `.toc` entry integrity validation.
 33. `.toi` textual interface generation baseline is available:
     deterministic extraction from contract AST for `public`/`external` functions
     (with optional `@selector` lines) plus event signatures.
