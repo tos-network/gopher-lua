@@ -239,18 +239,40 @@ func mainAux() int {
 	}
 	if len(opt_ctor) > 0 {
 		if flag.NArg() == 0 {
-			fmt.Println("TOR package mode requires an input directory")
+			fmt.Println("TOR package mode requires an input directory or .tol source file")
 			return 1
 		}
-		root := flag.Arg(0)
-		manifest, files, err := collectTORPackageInputs(root)
+		input := flag.Arg(0)
+		info, err := os.Stat(input)
 		if err != nil {
 			fmt.Println(err.Error())
 			return 1
 		}
-		tor, err := lua.EncodeTOR(manifest, files)
-		if err != nil {
-			fmt.Println(err.Error())
+		var tor []byte
+		if info.IsDir() {
+			manifest, files, err := collectTORPackageInputs(input)
+			if err != nil {
+				fmt.Println(err.Error())
+				return 1
+			}
+			tor, err = lua.EncodeTOR(manifest, files)
+			if err != nil {
+				fmt.Println(err.Error())
+				return 1
+			}
+		} else if strings.HasSuffix(strings.ToLower(input), ".tol") {
+			src, err := os.ReadFile(input)
+			if err != nil {
+				fmt.Println(err.Error())
+				return 1
+			}
+			tor, err = lua.CompileTOLToTOR(src, input, nil)
+			if err != nil {
+				fmt.Println(err.Error())
+				return 1
+			}
+		} else {
+			fmt.Println("-ctor input must be a package directory or .tol source file")
 			return 1
 		}
 		if err := os.WriteFile(opt_ctor, tor, 0o644); err != nil {
@@ -259,7 +281,6 @@ func mainAux() int {
 		}
 		return 0
 	}
-
 	if nargs := flag.NArg(); nargs > 0 {
 		script := flag.Arg(0)
 		argtb := L.NewTable()

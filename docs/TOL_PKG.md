@@ -28,6 +28,7 @@ Currently landed in `tolang`:
   - `tolang -vtoc artifact.toc`
   - `tolang -vtoc -vtocsrc source.tol artifact.toc`
   - `tolang -ctor out.tor <package_dir>`
+  - `tolang -ctor out.tor <contract.tol>` (one-shot: `.tol` -> minimal `.tor`)
   - `tolang -dtor artifact.tor`
   - `tolang -dtorj artifact.tor`
   - `tolang -vtor artifact.tor`

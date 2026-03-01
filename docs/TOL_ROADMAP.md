@@ -75,6 +75,7 @@ Recent verifier hardening completed in this phase:
    - one-shot `.tol` -> `.tor` API path `CompileTOLToTOR` (minimal manifest + `.toc` + `.toi`)
    - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
      and archive inspection
+   - `-ctor` now also supports one-shot `.tol` -> `.tor` packaging
    - CLI strict TOR validation path (`-vtor`)
 
 ---
