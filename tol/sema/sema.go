@@ -268,6 +268,12 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Message: s.Kind + " statement requires an expression argument in current stage",
 					Span:    defaultSpan(filename),
 				})
+			} else if containsAssignExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in require/assert expression",
+					Span:    defaultSpan(filename),
+				})
 			}
 		case "revert":
 			if s.Expr != nil && !isStringLiteralExpr(s.Expr) {
@@ -282,6 +288,12 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidStmtShape,
 					Message: "emit statement requires a call-like payload (e.g. emit EventName(...))",
+					Span:    defaultSpan(filename),
+				})
+			} else if containsAssignExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in emit payload",
 					Span:    defaultSpan(filename),
 				})
 			} else {

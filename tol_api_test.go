@@ -413,6 +413,44 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsAssignExprInRequireExpr(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    require((x = 1), "BAD");
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected assignment-placement error")
+	}
+	if !strings.Contains(err.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsAssignExprInEmitPayload(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    emit Tick((x = 1));
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected assignment-placement error")
+	}
+	if !strings.Contains(err.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsSelectorBuiltinExprStatement(t *testing.T) {
 	src := []byte(`
 tol 0.2

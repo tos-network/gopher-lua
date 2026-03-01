@@ -79,7 +79,8 @@ Current parser/sema coverage in this branch:
    contract-scoped member-call visibility checks (`public/external` only),
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    selector-member assignment-target rejection (`*.selector` is read-only),
-   assignment-expression placement checks (value-context rejection),
+   assignment-expression placement checks (value-context rejection, including
+   `require/assert` expressions and `emit` payload arguments),
    non-void function return-path checks for current structured subset
    (all paths must value-return or `revert`; loops still conservative),
    statement-shape checks for current subset (`require/assert` payload, `emit` identifier-call payload),

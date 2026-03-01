@@ -1968,6 +1968,41 @@ func TestCheckRejectsRequireWithoutExpr(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsAssignExprInRequireExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "require",
+							Expr: &ast.Expr{
+								Kind: "assign",
+								Op:   "=",
+								Left: &ast.Expr{Kind: "ident", Value: "x"},
+								Right: &ast.Expr{
+									Kind:  "number",
+									Value: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsEmitNonCallExpr(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -1995,6 +2030,50 @@ func TestCheckRejectsEmitNonCallExpr(t *testing.T) {
 	}
 	if !strings.Contains(diags.Error(), "TOL2021") {
 		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsAssignExprInEmitPayload(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "Tick",
+								},
+								Args: []*ast.Expr{
+									{
+										Kind: "assign",
+										Op:   "=",
+										Left: &ast.Expr{Kind: "ident", Value: "x"},
+										Right: &ast.Expr{
+											Kind:  "number",
+											Value: "1",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
 	}
 }
 

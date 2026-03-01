@@ -780,7 +780,8 @@ Implemented:
     Assignment targets using literal identifiers (`true`/`false`/`nil`) are rejected.
     Selector-member targets (`*.selector`) are read-only and rejected as lvalues.
 16. Early semantic verifier restricts assignment-expression placement to supported
-    statement contexts (expression statement / `for` post), rejecting value-context use.
+    statement contexts (expression statement / `for` post), rejecting value-context use
+    including `require/assert` expressions and `emit` payload arguments.
 17. Non-void functions require all current-stage structured control paths to
     terminate with value-return or `revert` (loops are still conservatively treated).
 18. Statement-shape checks enforce current subset contracts:
