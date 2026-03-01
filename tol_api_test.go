@@ -618,6 +618,24 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLAcceptsRevertEmptyOrString(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn a() public {
+    revert;
+  }
+  fn b() public {
+    revert "BAD";
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsEmitDeclaredEventArityMismatch(t *testing.T) {
 	src := []byte(`
 tol 0.2
