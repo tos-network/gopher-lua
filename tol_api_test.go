@@ -525,3 +525,259 @@ contract Demo {
 		t.Fatalf("unexpected selector override: got=%s want=0xfeedbeef", got)
 	}
 }
+
+func TestCompileTOLToBytecodeStorageScalarSlot(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot total: u256;
+  }
+  fn add(v: u256) public {
+    set total = total + v;
+    return;
+  }
+  fn read() public {
+    set got = total;
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(u256)")))
+	L.Push(lNumberFromInt(5))
+	if err := L.PCall(2, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(u256)")))
+	L.Push(lNumberFromInt(7))
+	if err := L.PCall(2, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("read()")))
+	if err := L.PCall(1, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("got")); got != "12" {
+		t.Fatalf("unexpected storage read result: got=%s want=12", got)
+	}
+}
+
+func TestCompileTOLToBytecodeStorageMappingSlot(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot balances: mapping(address => u256);
+  }
+  fn add(who: address, amount: u256) public {
+    let cur: u256 = balances[who];
+    set balances[who] = cur + amount;
+    set got = balances[who];
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(address,u256)")))
+	L.Push(lNumberFromInt(11))
+	L.Push(lNumberFromInt(3))
+	if err := L.PCall(3, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("got")); got != "3" {
+		t.Fatalf("unexpected first mapping result: got=%s want=3", got)
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(address,u256)")))
+	L.Push(lNumberFromInt(11))
+	L.Push(lNumberFromInt(4))
+	if err := L.PCall(3, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("got")); got != "7" {
+		t.Fatalf("unexpected second mapping result: got=%s want=7", got)
+	}
+}
+
+func TestCompileTOLToBytecodeStorageArraySlot(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot xs: u256[];
+  }
+  fn append(v: u256) public {
+    xs.push(v);
+    set len_out = xs.length;
+    return;
+  }
+  fn read(i: u256) public {
+    set got = xs[i];
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("append(u256)")))
+	L.Push(lNumberFromInt(7))
+	if err := L.PCall(2, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("len_out")); got != "1" {
+		t.Fatalf("unexpected len after first push: got=%s want=1", got)
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("append(u256)")))
+	L.Push(lNumberFromInt(9))
+	if err := L.PCall(2, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("len_out")); got != "2" {
+		t.Fatalf("unexpected len after second push: got=%s want=2", got)
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("read(u256)")))
+	L.Push(lNumberFromInt(1))
+	if err := L.PCall(2, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("got")); got != "9" {
+		t.Fatalf("unexpected array index result: got=%s want=9", got)
+	}
+}
+
+func TestCompileTOLToBytecodeStorageNestedMappingSlot(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot allowances: mapping(address => mapping(address => u256));
+  }
+  fn add(owner: address, spender: address, amount: u256) public {
+    let cur: u256 = allowances[owner][spender];
+    set allowances[owner][spender] = cur + amount;
+    set got = allowances[owner][spender];
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(address,address,u256)")))
+	L.Push(lNumberFromInt(1))
+	L.Push(lNumberFromInt(2))
+	L.Push(lNumberFromInt(3))
+	if err := L.PCall(4, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("got")); got != "3" {
+		t.Fatalf("unexpected first nested mapping result: got=%s want=3", got)
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("add(address,address,u256)")))
+	L.Push(lNumberFromInt(1))
+	L.Push(lNumberFromInt(2))
+	L.Push(lNumberFromInt(4))
+	if err := L.PCall(4, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	if got := LVAsString(L.GetGlobal("got")); got != "7" {
+		t.Fatalf("unexpected second nested mapping result: got=%s want=7", got)
+	}
+}
+
+func TestCompileTOLToBytecodeStorageNestedMappingRejectsPartialIndex(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot allowances: mapping(address => mapping(address => u256));
+  }
+  fn bad(owner: address) public {
+    set got = allowances[owner];
+    return;
+  }
+}
+`)
+	_, err := CompileTOLToBytecode(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected compile error")
+	}
+	if !strings.Contains(err.Error(), "TOL3002") {
+		t.Fatalf("expected TOL3002 error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "requires exactly 2 index key(s)") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

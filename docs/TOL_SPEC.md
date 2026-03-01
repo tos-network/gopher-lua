@@ -762,6 +762,9 @@ Implemented:
     (`0x????????`).
 11. Selector member builtins are supported for externally dispatchable functions:
     `this.fn.selector` and `Contract.fn.selector`.
+12. Storage lowering in direct-IR path supports a deterministic core subset:
+    scalar slot reads/writes, mapping reads/writes (with exact declared key depth),
+    and top-level storage dynamic array `arr[i]`, `arr.length`, `arr.push(v)`.
 
 Partially implemented:
 
@@ -770,8 +773,9 @@ Partially implemented:
 2. `error`/`enum`/`modifier` declarations are currently skipped, not enforced.
 3. Constructor parameters are accepted and forwarded by wrapper call only;
    typed ABI decode/binding semantics are not implemented yet.
-4. Storage lowering in canonical direct-IR path is not implemented yet
-   (storage currently returns deterministic `TOL3002`).
+4. Storage lowering currently uses an internal deterministic runtime table model;
+   full spec-level canonical slot hashing/addressing and host-persistent storage
+   builtins are not wired yet.
 5. `continue` semantics are lowered via deterministic labels/goto in loops,
    but still need deeper verifier checks for corner-case control flow.
 6. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like

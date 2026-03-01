@@ -1,9 +1,9 @@
 package codegen
 
 import (
-	"strings"
 	"testing"
 
+	"github.com/tos-network/tolang/tol/ast"
 	"github.com/tos-network/tolang/tol/lower"
 )
 
@@ -20,18 +20,41 @@ func TestBytecodeMinimalLoweredProgram(t *testing.T) {
 	}
 }
 
-func TestBytecodeRejectsUnsupportedStorageInCurrentStage(t *testing.T) {
+func TestBytecodeSupportsStorageInDirectIR(t *testing.T) {
 	p := &lower.Program{
 		ContractName: "Demo",
 		StorageSlots: []lower.StorageSlot{
 			{Name: "x", Type: "u256"},
 		},
+		Functions: []lower.Function{
+			{
+				Name:      "setx",
+				Modifiers: []string{"public"},
+				Params: []ast.FieldDecl{
+					{Name: "v", Type: "u256"},
+				},
+				Body: []ast.Statement{
+					{
+						Kind: "set",
+						Target: &ast.Expr{
+							Kind:  "ident",
+							Value: "x",
+						},
+						Expr: &ast.Expr{
+							Kind:  "ident",
+							Value: "v",
+						},
+					},
+					{Kind: "return"},
+				},
+			},
+		},
 	}
-	_, err := Bytecode(p)
-	if err == nil {
-		t.Fatalf("expected codegen error")
+	bc, err := Bytecode(p)
+	if err != nil {
+		t.Fatalf("unexpected codegen error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "TOL3002") {
-		t.Fatalf("expected TOL3002 error, got: %v", err)
+	if len(bc) == 0 {
+		t.Fatalf("expected non-empty bytecode")
 	}
 }

@@ -1,6 +1,7 @@
 package lua
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"sort"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	luast "github.com/tos-network/tolang/ast"
+	"github.com/tos-network/tolang/parse"
 	tolast "github.com/tos-network/tolang/tol/ast"
 	"github.com/tos-network/tolang/tol/diag"
 	"github.com/tos-network/tolang/tol/lower"
@@ -21,15 +23,6 @@ import (
 func buildDirectIRFromLowered(p *lower.Program, sourceName string) (*IRProgram, error) {
 	if p == nil {
 		return nil, fmt.Errorf("[%s] nil lowered program", diag.CodeLowerNotImplemented)
-	}
-	if len(p.StorageSlots) > 0 {
-		return nil, fmt.Errorf("[%s] lowered features not yet supported by direct IR lowering: storage=%d functions=%d constructor=%v fallback=%v",
-			diag.CodeLowerUnsupportedFeature,
-			len(p.StorageSlots),
-			len(p.Functions),
-			p.HasConstructor,
-			p.HasFallback,
-		)
 	}
 
 	if sourceName == "" {
@@ -55,17 +48,24 @@ func buildBootstrapChunkFromLowered(p *lower.Program) ([]luast.Stmt, error) {
 	if !p.HasConstructor && !p.HasFallback && len(p.Functions) == 0 {
 		return []luast.Stmt{}, nil
 	}
-	if len(p.StorageSlots) != 0 {
-		return nil, fmt.Errorf("[%s] direct IR bootstrap requires storage to be empty in current stage", diag.CodeLowerUnsupportedFeature)
-	}
 
 	dispatchFns, err := collectDispatchFuncs(p.Functions)
 	if err != nil {
 		return nil, err
 	}
-	env := buildLoweringEnv(p.ContractName, dispatchFns)
+	env, err := buildLoweringEnv(p.ContractName, dispatchFns, p.StorageSlots)
+	if err != nil {
+		return nil, err
+	}
 
-	chunk := make([]luast.Stmt, 0, len(p.Functions)+6)
+	chunk := make([]luast.Stmt, 0, len(p.Functions)+16)
+	if len(p.StorageSlots) > 0 {
+		prelude, err := buildStoragePreludeFromLowered(env)
+		if err != nil {
+			return nil, err
+		}
+		chunk = append(chunk, prelude...)
+	}
 	for _, fn := range p.Functions {
 		st, err := lowerFunctionToLua(fn, env)
 		if err != nil {
@@ -108,17 +108,180 @@ type dispatchFunc struct {
 type loweringEnv struct {
 	contractName       string
 	selectorByFunction map[string]string
+	storageByName      map[string]storageSlotInfo
 }
 
-func buildLoweringEnv(contractName string, dispatchFns []dispatchFunc) *loweringEnv {
+type storageSlotKind string
+
+const (
+	storageKindScalar  storageSlotKind = "scalar"
+	storageKindMapping storageSlotKind = "mapping"
+	storageKindArray   storageSlotKind = "array"
+)
+
+type storageSlotInfo struct {
+	name         string
+	kind         storageSlotKind
+	typ          string
+	mappingDepth int
+}
+
+func buildLoweringEnv(contractName string, dispatchFns []dispatchFunc, storageSlots []lower.StorageSlot) (*loweringEnv, error) {
 	m := make(map[string]string, len(dispatchFns))
 	for _, df := range dispatchFns {
 		m[df.Name] = df.Signature
 	}
+	sm := make(map[string]storageSlotInfo, len(storageSlots))
+	for _, slot := range storageSlots {
+		name := strings.TrimSpace(slot.Name)
+		if name == "" {
+			return nil, fmt.Errorf("[%s] storage slot name cannot be empty", diag.CodeLowerUnsupportedFeature)
+		}
+		if _, exists := sm[name]; exists {
+			return nil, fmt.Errorf("[%s] duplicate storage slot '%s' in lowered program", diag.CodeLowerUnsupportedFeature, name)
+		}
+		kind := classifyStorageSlotKind(slot.Type)
+		sm[name] = storageSlotInfo{
+			name:         name,
+			kind:         kind,
+			typ:          strings.TrimSpace(slot.Type),
+			mappingDepth: mappingTypeDepth(slot.Type),
+		}
+	}
 	return &loweringEnv{
 		contractName:       contractName,
 		selectorByFunction: m,
+		storageByName:      sm,
+	}, nil
+}
+
+func classifyStorageSlotKind(t string) storageSlotKind {
+	norm := normalizeSelectorType(t)
+	compact := strings.ReplaceAll(norm, " ", "")
+	switch {
+	case strings.HasPrefix(compact, "mapping("):
+		return storageKindMapping
+	case strings.HasSuffix(compact, "]"):
+		return storageKindArray
+	default:
+		return storageKindScalar
 	}
+}
+
+func mappingTypeDepth(t string) int {
+	compact := strings.ReplaceAll(normalizeSelectorType(t), " ", "")
+	if compact == "" {
+		return 0
+	}
+	return strings.Count(compact, "mapping(")
+}
+
+func buildStoragePreludeFromLowered(env *loweringEnv) ([]luast.Stmt, error) {
+	if env == nil || len(env.storageByName) == 0 {
+		return []luast.Stmt{}, nil
+	}
+	names := make([]string, 0, len(env.storageByName))
+	for name := range env.storageByName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var sb strings.Builder
+	sb.WriteString("__tol_storage = __tol_storage or {}\n")
+	sb.WriteString("__tol_storage_meta = __tol_storage_meta or {}\n")
+	for _, name := range names {
+		info := env.storageByName[name]
+		sb.WriteString(fmt.Sprintf("__tol_storage_meta[%q] = %q\n", name, string(info.kind)))
+	}
+	sb.WriteString(`
+function __tol_sload(slot, ...)
+  local meta = __tol_storage_meta[slot]
+  local node = __tol_storage[slot]
+  local keys = {...}
+  if node == nil then
+    if meta == "mapping" then
+      node = {}
+      __tol_storage[slot] = node
+    elseif meta == "array" then
+      node = { __len = 0 }
+      __tol_storage[slot] = node
+    else
+      return 0
+    end
+  end
+  if #keys == 0 then
+    return node
+  end
+  local cur = node
+  for i = 1, #keys do
+    local k = keys[i]
+    local v = cur[k]
+    if v == nil then
+      return 0
+    end
+    if i == #keys then
+      return v
+    end
+    cur = v
+  end
+  return 0
+end
+
+function __tol_sstore(slot, value, ...)
+  local meta = __tol_storage_meta[slot]
+  local keys = {...}
+  if #keys == 0 then
+    __tol_storage[slot] = value
+    return value
+  end
+  local node = __tol_storage[slot]
+  if node == nil then
+    node = {}
+    if meta == "array" then
+      node.__len = 0
+    end
+    __tol_storage[slot] = node
+  end
+  local cur = node
+  for i = 1, #keys - 1 do
+    local k = keys[i]
+    local nxt = cur[k]
+    if nxt == nil then
+      nxt = {}
+      cur[k] = nxt
+    end
+    cur = nxt
+  end
+  local leaf = keys[#keys]
+  cur[leaf] = value
+  return value
+end
+
+function __tol_spush(slot, value)
+  local arr = __tol_storage[slot]
+  if arr == nil then
+    arr = { __len = 0 }
+    __tol_storage[slot] = arr
+  end
+  local n = arr.__len or 0
+  arr[n] = value
+  arr.__len = n + 1
+  return arr.__len
+end
+
+function __tol_slen(slot)
+  local arr = __tol_storage[slot]
+  if arr == nil then
+    return 0
+  end
+  return arr.__len or 0
+end
+`)
+	chunk, err := parse.Parse(bytes.NewReader([]byte(sb.String())), "<tol-storage-prelude>")
+	if err != nil {
+		return nil, fmt.Errorf("[%s] failed to build storage prelude: %w", diag.CodeLowerUnsupportedFeature, err)
+	}
+	return chunk, nil
 }
 
 func collectDispatchFuncs(funcs []lower.Function) ([]dispatchFunc, error) {
@@ -323,7 +486,11 @@ func lowerFunctionToLua(fn lower.Function, env *loweringEnv) (luast.Stmt, error)
 		parNames = append(parNames, name)
 	}
 
-	body, err := tolStmtsToLuaWithCtx(newLoweringCtx(env), fn.Body)
+	ctx := newLoweringCtx(env)
+	for _, name := range parNames {
+		ctx.declareLocal(name)
+	}
+	body, err := tolStmtsToLuaWithCtx(ctx, fn.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +522,11 @@ func lowerConstructorToLua(params []tolast.FieldDecl, body []tolast.Statement, e
 		parNames = append(parNames, name)
 	}
 
-	stmts, err := tolStmtsToLuaWithCtx(newLoweringCtx(env), body)
+	ctx := newLoweringCtx(env)
+	for _, name := range parNames {
+		ctx.declareLocal(name)
+	}
+	stmts, err := tolStmtsToLuaWithCtx(ctx, body)
 	if err != nil {
 		return nil, err
 	}
@@ -432,14 +603,18 @@ type loweringCtx struct {
 	labelSeq int
 	loops    []loweringLoop
 	env      *loweringEnv
+	scopes   []map[string]struct{}
 }
 
 func newLoweringCtx(env *loweringEnv) *loweringCtx {
-	return &loweringCtx{
+	c := &loweringCtx{
 		labelSeq: 0,
 		loops:    nil,
 		env:      env,
+		scopes:   nil,
 	}
+	c.pushScope()
+	return c
 }
 
 func (c *loweringCtx) newLabel(prefix string) string {
@@ -465,6 +640,79 @@ func (c *loweringCtx) currentContinueLabel() string {
 	return c.loops[len(c.loops)-1].continueLabel
 }
 
+func (c *loweringCtx) pushScope() {
+	c.scopes = append(c.scopes, map[string]struct{}{})
+}
+
+func (c *loweringCtx) popScope() {
+	if len(c.scopes) == 0 {
+		return
+	}
+	c.scopes = c.scopes[:len(c.scopes)-1]
+}
+
+func (c *loweringCtx) declareLocal(name string) {
+	if len(c.scopes) == 0 {
+		c.pushScope()
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	c.scopes[len(c.scopes)-1][name] = struct{}{}
+}
+
+func (c *loweringCtx) isLocalName(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	for i := len(c.scopes) - 1; i >= 0; i-- {
+		if _, ok := c.scopes[i][name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *loweringCtx) storageInfoByName(name string) (storageSlotInfo, bool) {
+	if c == nil || c.env == nil || len(c.env.storageByName) == 0 {
+		return storageSlotInfo{}, false
+	}
+	info, ok := c.env.storageByName[name]
+	return info, ok
+}
+
+func (c *loweringCtx) storagePathFromExpr(e *tolast.Expr) (string, []*tolast.Expr, bool) {
+	if c == nil || e == nil {
+		return "", nil, false
+	}
+	switch e.Kind {
+	case "paren":
+		return c.storagePathFromExpr(e.Left)
+	case "ident":
+		name := strings.TrimSpace(e.Value)
+		if name == "" || c.isLocalName(name) {
+			return "", nil, false
+		}
+		if _, ok := c.storageInfoByName(name); !ok {
+			return "", nil, false
+		}
+		return name, []*tolast.Expr{}, true
+	case "index":
+		slot, keys, ok := c.storagePathFromExpr(e.Object)
+		if !ok {
+			return "", nil, false
+		}
+		out := make([]*tolast.Expr, 0, len(keys)+1)
+		out = append(out, keys...)
+		out = append(out, e.Index)
+		return slot, out, true
+	default:
+		return "", nil, false
+	}
+}
+
 func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 	switch stmt.Kind {
 	case "let":
@@ -476,11 +724,19 @@ func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 			}
 			exprs = append(exprs, ex)
 		}
-		return withLineStmt(&luast.LocalAssignStmt{
+		out := withLineStmt(&luast.LocalAssignStmt{
 			Names: []string{stmt.Name},
 			Exprs: exprs,
-		}), nil
+		})
+		ctx.declareLocal(stmt.Name)
+		return out, nil
 	case "set":
+		if storageStmt, ok, err := lowerStorageStoreStmt(ctx, stmt.Target, stmt.Expr); ok || err != nil {
+			if err != nil {
+				return nil, err
+			}
+			return storageStmt, nil
+		}
 		lhs, err := tolExprToLua(ctx, stmt.Target)
 		if err != nil {
 			return nil, err
@@ -549,17 +805,22 @@ func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 	case "for":
 		block := make([]luast.Stmt, 0, 2)
 		if stmt.Init != nil {
+			ctx.pushScope()
 			initStmt, err := tolStmtToLua(ctx, *stmt.Init)
 			if err != nil {
+				ctx.popScope()
 				return nil, err
 			}
 			block = append(block, initStmt)
+		} else {
+			ctx.pushScope()
 		}
 
 		cond := luast.Expr(withLineExpr(&luast.TrueExpr{}))
 		if stmt.Cond != nil {
 			ce, err := tolExprToLua(ctx, stmt.Cond)
 			if err != nil {
+				ctx.popScope()
 				return nil, err
 			}
 			cond = ce
@@ -570,12 +831,14 @@ func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 		body, err := tolStmtsToLuaWithCtx(ctx, stmt.Body)
 		ctx.popLoop()
 		if err != nil {
+			ctx.popScope()
 			return nil, err
 		}
 		body = append(body, withLineStmt(&luast.LabelStmt{Name: continueLabel}))
 		if stmt.Post != nil {
 			postStmt, err := tolExprStmtToLua(ctx, stmt.Post)
 			if err != nil {
+				ctx.popScope()
 				return nil, err
 			}
 			body = append(body, postStmt)
@@ -584,6 +847,7 @@ func tolStmtToLua(ctx *loweringCtx, stmt tolast.Statement) (luast.Stmt, error) {
 			Condition: cond,
 			Stmts:     body,
 		}))
+		ctx.popScope()
 
 		return withLineStmt(&luast.DoBlockStmt{Stmts: block}), nil
 	case "expr":
@@ -618,6 +882,8 @@ func tolStmtsToLua(in []tolast.Statement) ([]luast.Stmt, error) {
 }
 
 func tolStmtsToLuaWithCtx(ctx *loweringCtx, in []tolast.Statement) ([]luast.Stmt, error) {
+	ctx.pushScope()
+	defer ctx.popScope()
 	if len(in) == 0 {
 		return []luast.Stmt{}, nil
 	}
@@ -637,6 +903,12 @@ func tolExprStmtToLua(ctx *loweringCtx, e *tolast.Expr) (luast.Stmt, error) {
 		return nil, fmt.Errorf("[%s] nil expression statement", diag.CodeLowerUnsupportedFeature)
 	}
 	if e.Kind == "assign" {
+		if storageStmt, ok, err := lowerStorageStoreStmt(ctx, e.Left, e.Right); ok || err != nil {
+			if err != nil {
+				return nil, err
+			}
+			return storageStmt, nil
+		}
 		lhs, err := tolExprToLua(ctx, e.Left)
 		if err != nil {
 			return nil, err
@@ -667,6 +939,9 @@ func tolExprToLua(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, error) {
 	}
 	switch e.Kind {
 	case "ident":
+		if slotName, keys, ok := ctx.storagePathFromExpr(e); ok {
+			return lowerStorageLoadExpr(ctx, slotName, keys)
+		}
 		switch e.Value {
 		case "true":
 			return withLineExpr(&luast.TrueExpr{}), nil
@@ -734,6 +1009,12 @@ func tolExprToLua(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, error) {
 			}
 			return selExpr, nil
 		}
+		if storageExpr, ok, err := lowerStoragePushCallExpr(ctx, e); ok || err != nil {
+			if err != nil {
+				return nil, err
+			}
+			return storageExpr, nil
+		}
 		callee, err := tolExprToLua(ctx, e.Callee)
 		if err != nil {
 			return nil, err
@@ -758,6 +1039,12 @@ func tolExprToLua(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, error) {
 			}
 			return sel, nil
 		}
+		if storageExpr, ok, err := lowerStorageLengthMemberExpr(ctx, e); ok || err != nil {
+			if err != nil {
+				return nil, err
+			}
+			return storageExpr, nil
+		}
 		obj, err := tolExprToLua(ctx, e.Object)
 		if err != nil {
 			return nil, err
@@ -767,6 +1054,9 @@ func tolExprToLua(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, error) {
 			Key:    withLineExpr(&luast.StringExpr{Value: e.Member}),
 		}), nil
 	case "index":
+		if slotName, keys, ok := ctx.storagePathFromExpr(e); ok {
+			return lowerStorageLoadExpr(ctx, slotName, keys)
+		}
 		obj, err := tolExprToLua(ctx, e.Object)
 		if err != nil {
 			return nil, err
@@ -829,6 +1119,148 @@ func lowerSelectorMemberExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, bool
 		return nil, true, fmt.Errorf("[%s] selector target '%s' is not externally dispatchable in current stage", diag.CodeLowerUnsupportedFeature, fnName)
 	}
 	return withLineExpr(&luast.StringExpr{Value: sel}), true, nil
+}
+
+func lowerStorageStoreStmt(ctx *loweringCtx, target *tolast.Expr, valueExpr *tolast.Expr) (luast.Stmt, bool, error) {
+	slotName, keys, ok := ctx.storagePathFromExpr(target)
+	if !ok {
+		return nil, false, nil
+	}
+	info, _ := ctx.storageInfoByName(slotName)
+	if err := validateStorageKeyShape(info, keys, "set"); err != nil {
+		return nil, true, err
+	}
+	value, err := tolExprToLua(ctx, valueExpr)
+	if err != nil {
+		return nil, true, err
+	}
+	args := make([]luast.Expr, 0, 2+len(keys))
+	args = append(args, withLineExpr(&luast.StringExpr{Value: slotName}))
+	args = append(args, value)
+	keyExprs, err := lowerStorageKeyExprs(ctx, keys)
+	if err != nil {
+		return nil, true, err
+	}
+	args = append(args, keyExprs...)
+	call := withLineExpr(&luast.FuncCallExpr{
+		Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_sstore"}),
+		Args:      args,
+		AdjustRet: true,
+	})
+	return withLineStmt(&luast.FuncCallStmt{Expr: call}), true, nil
+}
+
+func lowerStorageLoadExpr(ctx *loweringCtx, slotName string, keys []*tolast.Expr) (luast.Expr, error) {
+	info, _ := ctx.storageInfoByName(slotName)
+	if err := validateStorageKeyShape(info, keys, "read"); err != nil {
+		return nil, err
+	}
+	args := make([]luast.Expr, 0, 1+len(keys))
+	args = append(args, withLineExpr(&luast.StringExpr{Value: slotName}))
+	keyExprs, err := lowerStorageKeyExprs(ctx, keys)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, keyExprs...)
+	return withLineExpr(&luast.FuncCallExpr{
+		Func:      withLineExpr(&luast.IdentExpr{Value: "__tol_sload"}),
+		Args:      args,
+		AdjustRet: true,
+	}), nil
+}
+
+func lowerStorageLengthMemberExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, bool, error) {
+	if e == nil || e.Kind != "member" || e.Member != "length" {
+		return nil, false, nil
+	}
+	slotName, keys, ok := ctx.storagePathFromExpr(e.Object)
+	if !ok {
+		return nil, false, nil
+	}
+	info, _ := ctx.storageInfoByName(slotName)
+	if info.kind != storageKindArray || len(keys) != 0 {
+		return nil, true, fmt.Errorf("[%s] '.length' is supported only for top-level storage arrays in current stage", diag.CodeLowerUnsupportedFeature)
+	}
+	return withLineExpr(&luast.FuncCallExpr{
+		Func: withLineExpr(&luast.IdentExpr{Value: "__tol_slen"}),
+		Args: []luast.Expr{
+			withLineExpr(&luast.StringExpr{Value: slotName}),
+		},
+		AdjustRet: true,
+	}), true, nil
+}
+
+func lowerStoragePushCallExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, bool, error) {
+	if e == nil || e.Kind != "call" || e.Callee == nil || e.Callee.Kind != "member" || e.Callee.Member != "push" {
+		return nil, false, nil
+	}
+	slotName, keys, ok := ctx.storagePathFromExpr(e.Callee.Object)
+	if !ok {
+		return nil, false, nil
+	}
+	info, _ := ctx.storageInfoByName(slotName)
+	if info.kind != storageKindArray || len(keys) != 0 {
+		return nil, true, fmt.Errorf("[%s] '.push(v)' is supported only for top-level storage arrays in current stage", diag.CodeLowerUnsupportedFeature)
+	}
+	if len(e.Args) != 1 {
+		return nil, true, fmt.Errorf("[%s] storage array push requires exactly one argument", diag.CodeLowerUnsupportedFeature)
+	}
+	val, err := tolExprToLua(ctx, e.Args[0])
+	if err != nil {
+		return nil, true, err
+	}
+	return withLineExpr(&luast.FuncCallExpr{
+		Func: withLineExpr(&luast.IdentExpr{Value: "__tol_spush"}),
+		Args: []luast.Expr{
+			withLineExpr(&luast.StringExpr{Value: slotName}),
+			val,
+		},
+		AdjustRet: true,
+	}), true, nil
+}
+
+func lowerStorageKeyExprs(ctx *loweringCtx, keys []*tolast.Expr) ([]luast.Expr, error) {
+	if len(keys) == 0 {
+		return []luast.Expr{}, nil
+	}
+	out := make([]luast.Expr, 0, len(keys))
+	for _, k := range keys {
+		ex, err := tolExprToLua(ctx, k)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ex)
+	}
+	return out, nil
+}
+
+func validateStorageKeyShape(info storageSlotInfo, keys []*tolast.Expr, action string) error {
+	switch info.kind {
+	case storageKindScalar:
+		if len(keys) > 0 {
+			return fmt.Errorf("[%s] storage slot '%s' of type '%s' does not support indexed %s", diag.CodeLowerUnsupportedFeature, info.name, info.typ, action)
+		}
+		return nil
+	case storageKindMapping:
+		want := info.mappingDepth
+		if want <= 0 {
+			want = 1
+		}
+		if len(keys) != want {
+			return fmt.Errorf("[%s] storage mapping slot '%s' requires exactly %d index key(s), got %d", diag.CodeLowerUnsupportedFeature, info.name, want, len(keys))
+		}
+		return nil
+	case storageKindArray:
+		if action == "set" && len(keys) != 1 {
+			return fmt.Errorf("[%s] storage array slot '%s' set requires exactly one index in current stage", diag.CodeLowerUnsupportedFeature, info.name)
+		}
+		if action == "read" && len(keys) > 1 {
+			return fmt.Errorf("[%s] nested storage array indexing is not supported on slot '%s'", diag.CodeLowerUnsupportedFeature, info.name)
+		}
+		return nil
+	default:
+		return fmt.Errorf("[%s] unsupported storage slot kind for '%s'", diag.CodeLowerUnsupportedFeature, info.name)
+	}
 }
 
 func withLineExpr[T luast.Expr](e T) T {

@@ -18,7 +18,7 @@ Milestone progress snapshot:
 3. `M2` - In progress (early semantic checks implemented; full type system pending).
 4. `M3` - Not started.
 5. `M4` - In progress (selector and dispatch subset implemented; typed ABI ops pending).
-6. `M5` - Not started in direct-IR path.
+6. `M5` - In progress (direct-IR storage subset enabled: scalar/mapping/array core ops).
 7. `M6` - Partially complete (existing math intrinsics in runtime; full spec set pending).
 8. `M7` - In progress (direct IR bootstrap pipeline works for restricted subset).
 9. `M8` - Not started.
@@ -402,7 +402,8 @@ Risk 4: Host runtime mismatch between `tolang` and GTOS.
 
 ## 7. Immediate Next Actions
 
-1. Finish direct-IR backend for storage slots/mappings/arrays (remove current `TOL3002` path for storage).
+1. Extend direct-IR storage from current subset to spec-level semantics:
+   canonical slot hashing, persistent host-backed storage ops, and full nested composite support.
 2. Implement typed ABI decode/encode subset needed for external/public entry wrappers.
 3. Expand verifier for control-flow and function-level checks beyond current syntax/shape validation.
 4. Build CTMM conformance manifest and map each missing feature to concrete tests.
