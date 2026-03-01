@@ -2117,6 +2117,42 @@ func TestCheckRejectsEmitMemberCallPayload(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsEmitSelectorBuiltinPayload(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "selector",
+								},
+								Args: []*ast.Expr{
+									{Kind: "string", Value: "\"transfer(address,u256)\""},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
 func TestCheckAcceptsEmitCallExpr(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

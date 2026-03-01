@@ -84,7 +84,8 @@ Current parser/sema coverage in this branch:
    non-void function return-path checks for current structured subset
    (all paths must value-return or `revert`; loops still conservative),
    statement-shape checks for current subset (`require/assert` payload, `emit` identifier-call payload),
-   expression-only builtin statement rejection (`selector(...)` standalone/post usage),
+   expression-only builtin statement rejection (`selector(...)` standalone/post usage
+   and `emit selector(...)` payload target rejection),
    `revert` payload shape checks (empty or string literal in current stage),
    declared-event `emit` arity checks,
    declared-event-name resolution checks for `emit`,

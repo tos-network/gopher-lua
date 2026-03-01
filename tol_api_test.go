@@ -565,6 +565,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsEmitSelectorBuiltinPayload(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    emit selector("transfer(address,u256)");
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected emit payload shape error")
+	}
+	if !strings.Contains(err.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsDuplicateEventDeclarations(t *testing.T) {
 	src := []byte(`
 tol 0.2

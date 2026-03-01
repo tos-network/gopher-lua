@@ -786,7 +786,8 @@ Implemented:
     terminate with value-return or `revert` (loops are still conservatively treated).
 18. Statement-shape checks enforce current subset contracts:
     `require/assert` must carry expression payload; `emit` must carry identifier-call payload.
-    `selector("...")` is expression-only and cannot appear as standalone statement.
+    `selector("...")` is expression-only and cannot appear as standalone statement
+    or as `emit` payload target.
 19. `revert` payload is constrained to empty or string-literal form in current stage.
 20. For declared events, `emit EventName(...)` argument count is verifier-checked
     against the declaration arity.

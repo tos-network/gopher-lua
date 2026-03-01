@@ -304,6 +304,12 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 						Message: "emit statement payload must call an event identifier (e.g. EventName(...))",
 						Span:    defaultSpan(filename),
 					})
+				} else if name == "selector" {
+					*diags = append(*diags, diag.Diagnostic{
+						Code:    diag.CodeSemaInvalidStmtShape,
+						Message: "emit statement must call an event name, not selector(...) builtin",
+						Span:    defaultSpan(filename),
+					})
 				} else if want, exists := eventArity[name]; exists {
 					if argc != want {
 						*diags = append(*diags, diag.Diagnostic{
