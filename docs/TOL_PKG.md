@@ -6,6 +6,29 @@ Scope: File formats, package layout, standard library, and on-chain registry
 
 ---
 
+## Implementation Snapshot (2026-03-01)
+
+Currently landed in `tolang`:
+
+- API:
+  - `CompileTOLToTOC(source, name)` -> compile `.tol` to deterministic `.toc`
+  - `EncodeTOC(...)` / `DecodeTOC(...)`
+  - `VerifyTOCSourceHash(toc, sourceBytes)`
+- CLI:
+  - `tolang -ctoc out.toc input.tol`
+  - `tolang -dtoc artifact.toc`
+  - `tolang -dtocj artifact.toc`
+  - `tolang -vtoc artifact.toc`
+  - `tolang -vtoc -vtocsrc source.tol artifact.toc`
+
+Not landed yet:
+
+- `.toi` compile/import flow
+- `.tor` archive format + tooling
+- registry resolution (`tor://...`, `toc://...`)
+
+---
+
 ## 1. File Extensions
 
 | Extension | Full name | Description |
@@ -59,6 +82,12 @@ interface ITRC20 {
 ## 3. `.toc` — Compiled Bytecode
 
 A `.toc` file is the output of compiling a single `.tol` source file:
+
+```
+tolang -ctoc trc20.toc trc20.tol
+```
+
+Future ergonomic wrapper (planned):
 
 ```
 tol compile trc20.tol -o trc20.toc
