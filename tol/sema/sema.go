@@ -531,7 +531,11 @@ func emitCallInfo(e *ast.Expr) (string, int, bool) {
 
 func isStringLiteralExpr(e *ast.Expr) bool {
 	root := stripParens(e)
-	return root != nil && root.Kind == "string"
+	if root == nil || root.Kind != "string" {
+		return false
+	}
+	_, err := strconv.Unquote(strings.TrimSpace(root.Value))
+	return err == nil
 }
 
 func stripParens(e *ast.Expr) *ast.Expr {
