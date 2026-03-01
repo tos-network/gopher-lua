@@ -150,6 +150,7 @@ glua -di -bc contract.glbc
 Programmatic APIs:
 
 - `BuildIR` / `CompileIR` for `AST -> IR -> bytecode`
+- AST compilation is IR-native (no `FunctionProto` intermediate in the AST stage)
 - `CompileSourceToBytecode` to produce bytecode blobs
 - `LState.DoBytecode` / `LState.LoadBytecode` to execute precompiled contracts
 - `LState.Load` auto-detects bytecode by magic header

@@ -167,16 +167,16 @@ type CompileError struct { // {{{
 }
 
 func (e *CompileError) Error() string {
-	return fmt.Sprintf("compile error near line(%v) %v: %v", e.Line, e.context.Proto.SourceName, e.Message)
+	return fmt.Sprintf("compile error near line(%v) %v: %v", e.Line, e.context.Func.SourceName, e.Message)
 } // }}}
 
 type codeStore struct { // {{{
-	codes []uint32
+	codes []IRInstruction
 	lines []int
 	pc    int
 }
 
-func (cd *codeStore) Add(inst uint32, line int) {
+func (cd *codeStore) Add(inst IRInstruction, line int) {
 	if l := len(cd.codes); l <= 0 || cd.pc == l {
 		cd.codes = append(cd.codes, inst)
 		cd.lines = append(cd.lines, line)
@@ -188,23 +188,53 @@ func (cd *codeStore) Add(inst uint32, line int) {
 }
 
 func (cd *codeStore) AddABC(op int, a int, b int, c int, line int) {
-	cd.Add(opCreateABC(op, a, b, c), line)
+	cd.Add(IRInstruction{
+		Op:   op,
+		Type: opTypeABC,
+		A:    a,
+		B:    b,
+		C:    c,
+		Bx:   -1,
+		Sbx:  0,
+	}, line)
 }
 
 func (cd *codeStore) AddABx(op int, a int, bx int, line int) {
-	cd.Add(opCreateABx(op, a, bx), line)
+	cd.Add(IRInstruction{
+		Op:   op,
+		Type: opTypeABx,
+		A:    a,
+		B:    -1,
+		C:    -1,
+		Bx:   bx,
+		Sbx:  0,
+	}, line)
 }
 
 func (cd *codeStore) AddASbx(op int, a int, sbx int, line int) {
-	cd.Add(opCreateASbx(op, a, sbx), line)
+	cd.Add(IRInstruction{
+		Op:   op,
+		Type: opTypeASbx,
+		A:    a,
+		B:    -1,
+		C:    -1,
+		Bx:   -1,
+		Sbx:  sbx,
+	}, line)
+}
+
+func (cd *codeStore) AddRawWord(word uint32, line int) {
+	cd.Add(IRInstruction{
+		Op: -1, Type: opType(-1), A: -1, B: -1, C: -1, Bx: -1, Sbx: 0, Raw: word,
+	}, line)
 }
 
 func (cd *codeStore) PropagateKMV(top int, save *int, reg *int, inc int) {
 	lastinst := cd.Last()
-	if opGetArgA(lastinst) >= top {
-		switch opGetOpCode(lastinst) {
+	if lastinst.A >= top {
+		switch lastinst.Op {
 		case OP_LOADK:
-			cindex := opGetArgBx(lastinst)
+			cindex := lastinst.Bx
 			if cindex <= opMaxIndexRk {
 				cd.Pop()
 				*save = opRkAsk(cindex)
@@ -212,7 +242,7 @@ func (cd *codeStore) PropagateKMV(top int, save *int, reg *int, inc int) {
 			}
 		case OP_MOVE:
 			cd.Pop()
-			*save = opGetArgB(lastinst)
+			*save = lastinst.B
 			return
 		}
 	}
@@ -222,11 +252,11 @@ func (cd *codeStore) PropagateKMV(top int, save *int, reg *int, inc int) {
 
 func (cd *codeStore) PropagateMV(top int, save *int, reg *int, inc int) {
 	lastinst := cd.Last()
-	if opGetArgA(lastinst) >= top {
-		switch opGetOpCode(lastinst) {
+	if lastinst.A >= top {
+		switch lastinst.Op {
 		case OP_MOVE:
 			cd.Pop()
-			*save = opGetArgB(lastinst)
+			*save = lastinst.B
 			return
 		}
 	}
@@ -236,7 +266,7 @@ func (cd *codeStore) PropagateMV(top int, save *int, reg *int, inc int) {
 
 func (cd *codeStore) AddLoadNil(a, b, line int) {
 	last := cd.Last()
-	if opGetOpCode(last) == OP_LOADNIL && (opGetArgB(last)+1) == a {
+	if last.Op == OP_LOADNIL && (last.B+1) == a {
 		cd.SetB(cd.LastPC(), b)
 	} else {
 		cd.AddABC(OP_LOADNIL, a, b, 0, line)
@@ -244,34 +274,34 @@ func (cd *codeStore) AddLoadNil(a, b, line int) {
 }
 
 func (cd *codeStore) SetOpCode(pc int, v int) {
-	opSetOpCode(&cd.codes[pc], v)
+	cd.codes[pc].Op = v
 }
 
 func (cd *codeStore) SetA(pc int, v int) {
-	opSetArgA(&cd.codes[pc], v)
+	cd.codes[pc].A = v
 }
 
 func (cd *codeStore) SetB(pc int, v int) {
-	opSetArgB(&cd.codes[pc], v)
+	cd.codes[pc].B = v
 }
 
 func (cd *codeStore) SetC(pc int, v int) {
-	opSetArgC(&cd.codes[pc], v)
+	cd.codes[pc].C = v
 }
 
 func (cd *codeStore) SetBx(pc int, v int) {
-	opSetArgBx(&cd.codes[pc], v)
+	cd.codes[pc].Bx = v
 }
 
 func (cd *codeStore) SetSbx(pc int, v int) {
-	opSetArgSbx(&cd.codes[pc], v)
+	cd.codes[pc].Sbx = v
 }
 
-func (cd *codeStore) At(pc int) uint32 {
+func (cd *codeStore) At(pc int) IRInstruction {
 	return cd.codes[pc]
 }
 
-func (cd *codeStore) List() []uint32 {
+func (cd *codeStore) List() []IRInstruction {
 	return cd.codes[:cd.pc]
 }
 
@@ -283,9 +313,9 @@ func (cd *codeStore) LastPC() int {
 	return cd.pc - 1
 }
 
-func (cd *codeStore) Last() uint32 {
+func (cd *codeStore) Last() IRInstruction {
 	if cd.pc == 0 {
-		return opInvalidInstruction
+		return IRInstruction{Op: -1, Type: opTypeABC, A: -1, B: -1, C: -1, Bx: -1, Sbx: 0}
 	}
 	return cd.codes[cd.pc-1]
 }
@@ -426,7 +456,7 @@ func (b *codeBlock) HasToBeClosed() bool {
 }
 
 type funcContext struct {
-	Proto           *FunctionProto
+	Func            *IRFunction
 	Code            *codeStore
 	Parent          *funcContext
 	Upvalues        *varNamePool
@@ -441,8 +471,17 @@ type funcContext struct {
 
 func newFuncContext(sourcename string, parent *funcContext) *funcContext {
 	fc := &funcContext{
-		Proto:           newFunctionProto(sourcename),
-		Code:            &codeStore{make([]uint32, 0, 1024), make([]int, 0, 1024), 0},
+		Func: &IRFunction{
+			SourceName:         sourcename,
+			Instructions:       make([]IRInstruction, 0, 1024),
+			Constants:          make([]LValue, 0, 32),
+			Functions:          make([]*IRFunction, 0, 16),
+			DbgSourcePositions: make([]int, 0, 128),
+			DbgLocals:          make([]*DbgLocalInfo, 0, 16),
+			DbgCalls:           make([]DbgCall, 0, 128),
+			DbgUpvalues:        make([]string, 0, 16),
+		},
+		Code:            &codeStore{make([]IRInstruction, 0, 1024), make([]int, 0, 1024), 0},
 		Parent:          parent,
 		Upvalues:        newVarNamePool(0),
 		Block:           newCodeBlock(newVarNamePool(0), labelNoJump, nil, nil, 0),
@@ -462,7 +501,7 @@ func (fc *funcContext) CheckUnresolvedGoto() {
 		if !ok {
 			continue
 		}
-		raiseCompileError(fc, fc.Proto.LastLineDefined, "no visible label '%s' for <goto> at line %d", gotoLabel.Name, gotoLabel.Line)
+		raiseCompileError(fc, fc.Func.LastLineDefined, "no visible label '%s' for <goto> at line %d", gotoLabel.Name, gotoLabel.Line)
 	}
 }
 
@@ -548,15 +587,15 @@ func (fc *funcContext) GetLabelPc(label int) int {
 
 func (fc *funcContext) ConstIndex(value LValue) int {
 	ctype := value.Type()
-	for i, lv := range fc.Proto.Constants {
+	for i, lv := range fc.Func.Constants {
 		if lv.Type() == ctype && lv == value {
 			return i
 		}
 	}
-	fc.Proto.Constants = append(fc.Proto.Constants, value)
-	v := len(fc.Proto.Constants) - 1
+	fc.Func.Constants = append(fc.Func.Constants, value)
+	v := len(fc.Func.Constants) - 1
 	if v > opMaxArgBx {
-		raiseCompileError(fc, fc.Proto.LineDefined, "too many constants")
+		raiseCompileError(fc, fc.Func.LineDefined, "too many constants")
 	}
 	return v
 }
@@ -574,7 +613,7 @@ func (fc *funcContext) RegisterLocalVar(name string) int {
 
 func (fc *funcContext) RegisterLocalVarWithAttr(name string, attr ast.LocalAttr) int {
 	ret := fc.Block.LocalVars.RegisterWithAttr(name, attr)
-	fc.Proto.DbgLocals = append(fc.Proto.DbgLocals, &DbgLocalInfo{
+	fc.Func.DbgLocals = append(fc.Func.DbgLocals, &DbgLocalInfo{
 		Name:    name,
 		Reg:     ret,
 		Attr:    uint8(attr),
@@ -634,8 +673,8 @@ func (fc *funcContext) LeaveBlock() int {
 
 func (fc *funcContext) EndScope() {
 	for _, vr := range fc.Block.LocalVars.List() {
-		for i := len(fc.Proto.DbgLocals) - 1; i >= 0; i-- {
-			li := fc.Proto.DbgLocals[i]
+		for i := len(fc.Func.DbgLocals) - 1; i >= 0; i-- {
+			li := fc.Func.DbgLocals[i]
 			if li.Reg == vr.Index && li.EndPc == 0 {
 				li.EndPc = fc.Code.LastPC()
 				break
@@ -646,7 +685,7 @@ func (fc *funcContext) EndScope() {
 
 func (fc *funcContext) SetRegTop(top int) {
 	if top > maxRegisters {
-		raiseCompileError(fc, fc.Proto.LineDefined, "too many local variables")
+		raiseCompileError(fc, fc.Func.LineDefined, "too many local variables")
 	}
 	fc.regTop = top
 }
@@ -1235,10 +1274,10 @@ func compileExpr(context *funcContext, reg int, expr ast.Expr, ec *expcontext) i
 		}
 		return sused
 	case *ast.Comma3Expr:
-		if context.Proto.IsVarArg == 0 {
+		if context.Func.IsVarArg == 0 {
 			raiseCompileError(context, sline(ex), "cannot use '...' outside a vararg function")
 		}
-		context.Proto.IsVarArg &= ^VarArgNeedsArg
+		context.Func.IsVarArg &= ^VarArgNeedsArg
 		code.AddABC(OP_VARARG, sreg, 2+ec.varargopt, 0, sline(ex))
 		if context.RegTop() > (sreg+2+ec.varargopt) || ec.varargopt < -1 {
 			return 0
@@ -1277,10 +1316,10 @@ func compileExpr(context *funcContext, reg int, expr ast.Expr, ec *expcontext) i
 	case *ast.FuncCallExpr:
 		return compileFuncCallExpr(context, reg, ex, ec)
 	case *ast.FunctionExpr:
-		childcontext := newFuncContext(context.Proto.SourceName, context)
+		childcontext := newFuncContext(context.Func.SourceName, context)
 		compileFunctionExpr(childcontext, ex, ec)
-		protono := len(context.Proto.FunctionPrototypes)
-		context.Proto.FunctionPrototypes = append(context.Proto.FunctionPrototypes, childcontext.Proto)
+		protono := len(context.Func.Functions)
+		context.Func.Functions = append(context.Func.Functions, childcontext.Func)
 		code.AddABx(OP_CLOSURE, sreg, protono, sline(ex))
 		for _, upvalue := range childcontext.Upvalues.List() {
 			localidx, block := context.FindLocalVarAndBlock(upvalue.Name)
@@ -1382,14 +1421,14 @@ func constFold(exp ast.Expr) ast.Expr { // {{{
 } // }}}
 
 func compileFunctionExpr(context *funcContext, funcexpr *ast.FunctionExpr, ec *expcontext) { // {{{
-	context.Proto.LineDefined = sline(funcexpr)
-	context.Proto.LastLineDefined = eline(funcexpr)
+	context.Func.LineDefined = sline(funcexpr)
+	context.Func.LastLineDefined = eline(funcexpr)
 	if len(funcexpr.ParList.Names) > maxRegisters {
-		raiseCompileError(context, context.Proto.LineDefined, "register overflow")
+		raiseCompileError(context, context.Func.LineDefined, "register overflow")
 	}
-	context.Proto.NumParameters = uint8(len(funcexpr.ParList.Names))
+	context.Func.NumParameters = uint8(len(funcexpr.ParList.Names))
 	if ec.ctype == ecMethod {
-		context.Proto.NumParameters += 1
+		context.Func.NumParameters += 1
 		context.RegisterLocalVar("self")
 	}
 	for _, name := range funcexpr.ParList.Names {
@@ -1397,12 +1436,12 @@ func compileFunctionExpr(context *funcContext, funcexpr *ast.FunctionExpr, ec *e
 	}
 	if funcexpr.ParList.HasVargs {
 		if CompatVarArg {
-			context.Proto.IsVarArg = VarArgHasArg | VarArgNeedsArg
+			context.Func.IsVarArg = VarArgHasArg | VarArgNeedsArg
 			if context.Parent != nil {
 				context.RegisterLocalVar("arg")
 			}
 		}
-		context.Proto.IsVarArg |= VarArgIsVarArg
+		context.Func.IsVarArg |= VarArgIsVarArg
 	}
 
 	compileChunk(context, funcexpr.Stmts, false)
@@ -1410,17 +1449,10 @@ func compileFunctionExpr(context *funcContext, funcexpr *ast.FunctionExpr, ec *e
 	context.Code.AddABC(OP_RETURN, 0, 1, 0, eline(funcexpr))
 	context.EndScope()
 	context.CheckUnresolvedGoto()
-	context.Proto.Code = context.Code.List()
-	context.Proto.DbgSourcePositions = context.Code.PosList()
-	context.Proto.DbgUpvalues = context.Upvalues.Names()
-	context.Proto.NumUpvalues = uint8(len(context.Proto.DbgUpvalues))
-	for _, clv := range context.Proto.Constants {
-		sv := ""
-		if slv, ok := clv.(LString); ok {
-			sv = string(slv)
-		}
-		context.Proto.stringConstants = append(context.Proto.stringConstants, sv)
-	}
+	context.Func.Instructions = context.Code.List()
+	context.Func.DbgSourcePositions = context.Code.PosList()
+	context.Func.DbgUpvalues = context.Upvalues.Names()
+	context.Func.NumUpvalues = uint8(len(context.Func.DbgUpvalues))
 	patchCode(context)
 } // }}}
 
@@ -1484,7 +1516,7 @@ func compileTableExpr(context *funcContext, reg int, ex *ast.TableExpr, ec *expc
 			}
 			code.AddABC(OP_SETLIST, tablereg, b, c, sline(line))
 			if c == 0 {
-				code.Add(uint32(c), sline(line))
+				code.AddRawWord(uint32(c), sline(line))
 			}
 		}
 	}
@@ -1554,7 +1586,7 @@ func compileStringConcatOpExpr(context *funcContext, reg int, expr *ast.StringCo
 	basereg := reg
 	reg += compileExpr(context, reg, expr.Lhs, ecnone(0))
 	reg += compileExpr(context, reg, expr.Rhs, ecnone(0))
-	for pc := code.LastPC(); pc != 0 && opGetOpCode(code.At(pc)) == OP_CONCAT; pc-- {
+	for pc := code.LastPC(); pc != 0 && code.At(pc).Op == OP_CONCAT; pc-- {
 		code.Pop()
 	}
 	code.AddABC(OP_CONCAT, a, basereg, basereg+crange, sline(expr))
@@ -1665,7 +1697,7 @@ func compileLogicalOpExpr(context *funcContext, reg int, expr *ast.LogicalOpExpr
 	}
 
 	lastinst := code.Last()
-	if opGetOpCode(lastinst) == OP_JMP && opGetArgSbx(lastinst) == endlabel {
+	if lastinst.Op == OP_JMP && lastinst.Sbx == endlabel {
 		code.Pop()
 	}
 
@@ -1760,7 +1792,7 @@ func compileLogicalOpExprAux(context *funcContext, reg int, expr ast.Expr, ec *e
 	} else if !hasnextcond && thenlabel == elselabel {
 		reg += compileExpr(context, reg, expr, &expcontext{ec.ctype, intMax(a, sreg), ec.varargopt})
 		last := context.Code.Last()
-		if opGetOpCode(last) == OP_MOVE && opGetArgA(last) == a {
+		if last.Op == OP_MOVE && last.A == a {
 			context.Code.SetA(context.Code.LastPC(), sreg)
 		} else {
 			context.Code.AddABC(OP_MOVE, sreg, a, 0, sline(expr))
@@ -1778,7 +1810,7 @@ func compileLogicalOpExprAux(context *funcContext, reg int, expr ast.Expr, ec *e
 
 func compileFuncCallExpr(context *funcContext, reg int, expr *ast.FuncCallExpr, ec *expcontext) int { // {{{
 	funcreg := reg
-	if ec.ctype == ecLocal && ec.reg == (int(context.Proto.NumParameters)-1) {
+	if ec.ctype == ecLocal && ec.reg == (int(context.Func.NumParameters)-1) {
 		funcreg = ec.reg
 		reg = ec.reg
 	}
@@ -1817,7 +1849,7 @@ func compileFuncCallExpr(context *funcContext, reg int, expr *ast.FuncCallExpr, 
 		b = 0
 	}
 	context.Code.AddABC(OP_CALL, funcreg, b, ec.varargopt+2, sline(expr))
-	context.Proto.DbgCalls = append(context.Proto.DbgCalls, DbgCall{Pc: context.Code.LastPC(), Name: name})
+	context.Func.DbgCalls = append(context.Func.DbgCalls, DbgCall{Pc: context.Code.LastPC(), Name: name})
 
 	if ec.varargopt == 0 && shouldmove(ec, funcreg) {
 		context.Code.AddABC(OP_MOVE, ec.reg, funcreg, 0, sline(expr))
@@ -1869,17 +1901,17 @@ func getExprName(context *funcContext, expr ast.Expr) string { // {{{
 
 func patchCode(context *funcContext) { // {{{
 	maxreg := 1
-	if np := int(context.Proto.NumParameters); np > 1 {
+	if np := int(context.Func.NumParameters); np > 1 {
 		maxreg = np
 	}
 	moven := 0
 	code := context.Code.List()
 	for pc := 0; pc < len(code); pc++ {
 		inst := code[pc]
-		curop := opGetOpCode(inst)
+		curop := inst.Op
 		switch curop {
 		case OP_CLOSURE:
-			pc += int(context.Proto.FunctionPrototypes[opGetArgBx(inst)].NumUpvalues)
+			pc += int(context.Func.Functions[inst.Bx].NumUpvalues)
 			moven = 0
 			continue
 		case OP_SETGLOBAL, OP_SETUPVAL, OP_EQ, OP_LT, OP_LE, OP_TEST,
@@ -1887,29 +1919,29 @@ func patchCode(context *funcContext) { // {{{
 			OP_SETLIST, OP_CLOSE:
 			/* nothing to do */
 		case OP_CALL:
-			if reg := opGetArgA(inst) + opGetArgC(inst) - 2; reg > maxreg {
+			if reg := inst.A + inst.C - 2; reg > maxreg {
 				maxreg = reg
 			}
 		case OP_VARARG:
-			if reg := opGetArgA(inst) + opGetArgB(inst) - 1; reg > maxreg {
+			if reg := inst.A + inst.B - 1; reg > maxreg {
 				maxreg = reg
 			}
 		case OP_SELF:
-			if reg := opGetArgA(inst) + 1; reg > maxreg {
+			if reg := inst.A + 1; reg > maxreg {
 				maxreg = reg
 			}
 		case OP_LOADNIL:
-			if reg := opGetArgB(inst); reg > maxreg {
+			if reg := inst.B; reg > maxreg {
 				maxreg = reg
 			}
 		case OP_JMP: // jump to jump optimization
 			distance := 0
 			count := 0 // avoiding infinite loops
-			for jmp := inst; opGetOpCode(jmp) == OP_JMP && count < 5; jmp = context.Code.At(pc + distance + 1) {
-				d := context.GetLabelPc(opGetArgSbx(jmp)) - pc
+			for jmp := inst; jmp.Op == OP_JMP && count < 5; jmp = context.Code.At(pc + distance + 1) {
+				d := context.GetLabelPc(jmp.Sbx) - pc
 				if d > opMaxArgSbx {
 					if distance == 0 {
-						raiseCompileError(context, context.Proto.LineDefined, "too long to jump.")
+						raiseCompileError(context, context.Func.LineDefined, "too long to jump.")
 					}
 					break
 				}
@@ -1922,7 +1954,7 @@ func patchCode(context *funcContext) { // {{{
 				context.Code.SetSbx(pc, distance)
 			}
 		default:
-			if reg := opGetArgA(inst); reg > maxreg {
+			if reg := inst.A; reg > maxreg {
 				maxreg = reg
 			}
 		}
@@ -1940,12 +1972,12 @@ func patchCode(context *funcContext) { // {{{
 	}
 	maxreg++
 	if maxreg > maxRegisters {
-		raiseCompileError(context, context.Proto.LineDefined, "register overflow(too many local variables)")
+		raiseCompileError(context, context.Func.LineDefined, "register overflow(too many local variables)")
 	}
-	context.Proto.NumUsedRegisters = uint8(maxreg)
+	context.Func.NumUsedRegs = uint8(maxreg)
 } // }}}
 
-func compileASTToProtoDirect(chunk []ast.Stmt, name string) (proto *FunctionProto, err error) { // {{{
+func compileASTToIRDirect(chunk []ast.Stmt, name string) (root *IRFunction, err error) { // {{{
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			if _, ok := rcv.(*CompileError); ok {
@@ -1964,7 +1996,7 @@ func compileASTToProtoDirect(chunk []ast.Stmt, name string) (proto *FunctionProt
 	}
 	context := newFuncContext(name, nil)
 	compileFunctionExpr(context, funcexpr, ecnone(0))
-	proto = context.Proto
+	root = context.Func
 	return
 } // }}}
 

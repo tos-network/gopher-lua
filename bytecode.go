@@ -444,7 +444,8 @@ func readProto(r *byteReader) (*FunctionProto, error) {
 }
 
 func validateDecodedProto(p *FunctionProto) error {
-	for i, inst := range p.Code {
+	for i := 0; i < len(p.Code); i++ {
+		inst := p.Code[i]
 		op := opGetOpCode(inst)
 		if op < 0 || op > opCodeMax {
 			return fmt.Errorf("invalid opcode %d at pc %d", op, i)
@@ -454,6 +455,12 @@ func validateDecodedProto(p *FunctionProto) error {
 			if bx < 0 || bx >= len(p.FunctionPrototypes) {
 				return fmt.Errorf("invalid closure prototype index %d at pc %d", bx, i)
 			}
+		}
+		if op == OP_SETLIST && opGetArgC(inst) == 0 {
+			if i+1 >= len(p.Code) {
+				return fmt.Errorf("missing SETLIST extra word at pc %d", i)
+			}
+			i++
 		}
 	}
 	for _, child := range p.FunctionPrototypes {

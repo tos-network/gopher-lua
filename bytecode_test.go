@@ -171,3 +171,46 @@ func TestDecodeRejectsLegacyHeaderLayout(t *testing.T) {
 		t.Fatal("expected legacy format rejection")
 	}
 }
+
+func TestIRPreservesSetListExtraWord(t *testing.T) {
+	p := newFunctionProto("<setlist-extra>")
+	p.NumUsedRegisters = 2
+	p.Code = []uint32{
+		opCreateABC(OP_NEWTABLE, 0, 0, 0),
+		opCreateABC(OP_SETLIST, 0, 1, 0), // C == 0 => next word is raw block index
+		777,
+		opCreateABC(OP_RETURN, 0, 1, 0),
+	}
+	p.DbgSourcePositions = []int{1, 1, 1, 1}
+
+	irp := BuildIRFromProto(p, "<setlist-extra>")
+	if irp == nil || irp.Root == nil {
+		t.Fatal("expected non-nil IR")
+	}
+	if len(irp.Root.Instructions) != 4 {
+		t.Fatalf("unexpected IR length: got=%d want=4", len(irp.Root.Instructions))
+	}
+	if irp.Root.Instructions[2].Op >= 0 || irp.Root.Instructions[2].Raw != 777 {
+		t.Fatalf("expected raw extra word 777 in IR, got op=%d raw=%d", irp.Root.Instructions[2].Op, irp.Root.Instructions[2].Raw)
+	}
+
+	out, err := CompileIR(irp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Code) != 4 || out.Code[2] != 777 {
+		t.Fatalf("expected proto extra word 777 preserved, got code=%v", out.Code)
+	}
+
+	bc, err := EncodeFunctionProto(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dec, err := DecodeFunctionProto(bc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dec.Code) != 4 || dec.Code[2] != 777 {
+		t.Fatalf("expected decode to preserve extra word 777, got code=%v", dec.Code)
+	}
+}

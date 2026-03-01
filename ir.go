@@ -17,6 +17,7 @@ type IRInstruction struct {
 	C    int
 	Bx   int
 	Sbx  int
+	Raw  uint32
 }
 
 // IRFunction mirrors FunctionProto but stores decoded instructions.
@@ -56,11 +57,14 @@ func (p *IRProgram) String() string {
 
 // BuildIR compiles AST to the IR layer.
 func BuildIR(chunk []ast.Stmt, name string) (*IRProgram, error) {
-	proto, err := compileASTToProtoDirect(chunk, name)
+	root, err := compileASTToIRDirect(chunk, name)
 	if err != nil {
 		return nil, err
 	}
-	return BuildIRFromProto(proto, name), nil
+	if name == "" && root != nil {
+		name = root.SourceName
+	}
+	return &IRProgram{Name: name, Root: root}, nil
 }
 
 // BuildIRFromProto decodes a FunctionProto into IR.
@@ -104,9 +108,10 @@ func irFromProto(p *FunctionProto) *IRFunction {
 		DbgCalls:           append([]DbgCall(nil), p.DbgCalls...),
 		DbgUpvalues:        append([]string(nil), p.DbgUpvalues...),
 	}
-	for _, inst := range p.Code {
+	for i := 0; i < len(p.Code); i++ {
+		inst := p.Code[i]
 		op := opGetOpCode(inst)
-		ins := IRInstruction{Op: op, Type: opProps[op].Type, A: opGetArgA(inst)}
+		ins := IRInstruction{Op: op, Type: opProps[op].Type, A: opGetArgA(inst), Raw: 0}
 		switch ins.Type {
 		case opTypeABC:
 			ins.B = opGetArgB(inst)
@@ -117,6 +122,12 @@ func irFromProto(p *FunctionProto) *IRFunction {
 			ins.Sbx = opGetArgSbx(inst)
 		}
 		irf.Instructions = append(irf.Instructions, ins)
+		if op == OP_SETLIST && ins.C == 0 && i+1 < len(p.Code) {
+			i++
+			irf.Instructions = append(irf.Instructions, IRInstruction{
+				Op: -1, Type: opType(-1), A: -1, B: -1, C: -1, Bx: -1, Sbx: 0, Raw: p.Code[i],
+			})
+		}
 	}
 	for _, child := range p.FunctionPrototypes {
 		irf.Functions = append(irf.Functions, irFromProto(child))
@@ -142,6 +153,10 @@ func protoFromIR(irf *IRFunction) *FunctionProto {
 		DbgUpvalues:        append([]string(nil), irf.DbgUpvalues...),
 	}
 	for _, ins := range irf.Instructions {
+		if ins.Op < 0 {
+			p.Code = append(p.Code, ins.Raw)
+			continue
+		}
 		switch ins.Type {
 		case opTypeABC:
 			p.Code = append(p.Code, opCreateABC(ins.Op, ins.A, ins.B, ins.C))
@@ -174,6 +189,10 @@ func writeIRFunction(b *strings.Builder, f *IRFunction, depth int) {
 	indent := strings.Repeat("  ", depth)
 	fmt.Fprintf(b, "%sfunction %q params=%d regs=%d up=%d\n", indent, f.SourceName, f.NumParameters, f.NumUsedRegs, f.NumUpvalues)
 	for pc, ins := range f.Instructions {
+		if ins.Op < 0 {
+			fmt.Fprintf(b, "%s  [%03d] RAW      0x%08x\n", indent, pc+1, ins.Raw)
+			continue
+		}
 		name := "INVALID"
 		if ins.Op >= 0 && ins.Op <= opCodeMax {
 			name = opProps[ins.Op].Name
