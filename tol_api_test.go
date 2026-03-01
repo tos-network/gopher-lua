@@ -1293,6 +1293,25 @@ contract Demo {
 	}
 }
 
+func TestCompileTOLToBytecodeSelectorBuiltinRejectsNonLiteralArgWithParenCallee(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn bad(sig: string) public {
+    set sel = (selector)(sig);
+    return;
+  }
+}
+`)
+	_, err := CompileTOLToBytecode(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected compile error")
+	}
+	if !strings.Contains(err.Error(), "TOL2012") {
+		t.Fatalf("expected TOL2012 error, got: %v", err)
+	}
+}
+
 func TestCompileTOLToBytecodeSelectorBuiltinRejectsEmptyLiteralArg(t *testing.T) {
 	src := []byte(`
 tol 0.2

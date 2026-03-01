@@ -1305,7 +1305,8 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 	}
 	switch e.Kind {
 	case "call":
-		if e.Callee != nil && e.Callee.Kind == "ident" && e.Callee.Value == "selector" {
+		callee := stripParens(e.Callee)
+		if callee != nil && callee.Kind == "ident" && strings.TrimSpace(callee.Value) == "selector" {
 			if len(e.Args) != 1 || e.Args[0] == nil || e.Args[0].Kind != "string" {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidSelectorExpr,

@@ -453,6 +453,49 @@ func TestCheckRejectsSelectorBuiltinNonLiteral(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsSelectorBuiltinNonLiteralWithParenCallee(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind: "set",
+							Target: &ast.Expr{
+								Kind:  "ident",
+								Value: "x",
+							},
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind: "paren",
+									Left: &ast.Expr{
+										Kind:  "ident",
+										Value: "selector",
+									},
+								},
+								Args: []*ast.Expr{
+									{Kind: "ident", Value: "sig"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2012") {
+		t.Fatalf("expected TOL2012, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsSelectorBuiltinEmptyLiteral(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
