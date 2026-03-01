@@ -3,6 +3,7 @@ package sema
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/tos-network/tolang/tol/ast"
@@ -273,6 +274,12 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidStmtShape,
 					Message: s.Kind + " statement requires a string message argument in current stage",
+					Span:    defaultSpan(filename),
+				})
+			} else if _, err := strconv.Unquote(strings.TrimSpace(s.Text)); err != nil {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidStmtShape,
+					Message: s.Kind + " statement message must be a string literal in current stage",
 					Span:    defaultSpan(filename),
 				})
 			} else if containsAssignExpr(s.Expr) {

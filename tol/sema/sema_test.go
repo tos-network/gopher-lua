@@ -2094,6 +2094,62 @@ func TestCheckRejectsAssertMissingMessage(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsRequireNonLiteralMessage(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "require",
+							Expr: &ast.Expr{Kind: "ident", Value: "ok"},
+							Text: "BAD",
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsAssertNonLiteralMessage(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "assert",
+							Expr: &ast.Expr{Kind: "ident", Value: "ok"},
+							Text: "BAD",
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsEmitNonCallExpr(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

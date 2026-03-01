@@ -785,7 +785,7 @@ Implemented:
 17. Non-void functions require all current-stage structured control paths to
     terminate with value-return or `revert` (loops are still conservatively treated).
 18. Statement-shape checks enforce current subset contracts:
-    `require/assert` must carry condition expression plus string message;
+    `require/assert` must carry condition expression plus string-literal message;
     `emit` must carry identifier-call payload.
     `selector("...")` is expression-only and cannot appear as standalone statement
     or as `emit` payload target.
