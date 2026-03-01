@@ -75,7 +75,7 @@ bytecode.
 Current generated form:
 
 ```
-tolang -ctoi ITRC20.toi trc20.tol
+tol compile --emit toi -o ITRC20.toi trc20.tol
 ```
 
 ```tol
@@ -106,13 +106,7 @@ interface ITRC20 {
 A `.toc` file is the output of compiling a single `.tol` source file:
 
 ```
-tolang -ctoc trc20.toc trc20.tol
-```
-
-Future ergonomic wrapper (planned):
-
-```
-tol compile trc20.tol -o trc20.toc
+tol compile -o trc20.toc trc20.tol
 ```
 
 Fields embedded in a `.toc`:

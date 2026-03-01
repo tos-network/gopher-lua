@@ -77,6 +77,38 @@ func TestCmdCompileDefaultTOCOutput(t *testing.T) {
 	}
 }
 
+func TestCmdCompileDefaultTOIAndTOROutput(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "sample.tol")
+	if err := os.WriteFile(input, []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n"), 0o644); err != nil {
+		t.Fatalf("write input: %v", err)
+	}
+
+	if code := cmdCompile([]string{"--emit", "toi", input}); code != 0 {
+		t.Fatalf("cmdCompile toi exit code: got=%d want=0", code)
+	}
+	toiPath := filepath.Join(dir, "sample.toi")
+	toiBody, err := os.ReadFile(toiPath)
+	if err != nil {
+		t.Fatalf("read output toi: %v", err)
+	}
+	if err := lua.ValidateTOIText(toiBody); err != nil {
+		t.Fatalf("validate output toi: %v", err)
+	}
+
+	if code := cmdCompile([]string{"--emit", "tor", input}); code != 0 {
+		t.Fatalf("cmdCompile tor exit code: got=%d want=0", code)
+	}
+	torPath := filepath.Join(dir, "sample.tor")
+	torBody, err := os.ReadFile(torPath)
+	if err != nil {
+		t.Fatalf("read output tor: %v", err)
+	}
+	if _, err := lua.DecodeTOR(torBody); err != nil {
+		t.Fatalf("decode output tor: %v", err)
+	}
+}
+
 func TestCmdVerifyTOCSourceMismatchExitCode(t *testing.T) {
 	dir := t.TempDir()
 	srcPath := filepath.Join(dir, "sample.tol")
