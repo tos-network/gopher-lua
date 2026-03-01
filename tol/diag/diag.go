@@ -32,6 +32,7 @@ const (
 	CodeSemaUnknownEmitEvent    = "TOL2025"
 	CodeSemaNameCollision       = "TOL2026"
 	CodeSemaSelectorVisibility  = "TOL2027"
+	CodeSemaDuplicateLocal      = "TOL2028"
 	CodeLowerNotImplemented     = "TOL3001"
 	CodeLowerUnsupportedFeature = "TOL3002"
 	CodeCodegenNotImplemented   = "TOL4001"

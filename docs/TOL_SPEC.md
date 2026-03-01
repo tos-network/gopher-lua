@@ -791,6 +791,8 @@ Implemented:
 23. Cross-namespace name collision checks are enforced for this stage
     (`event`/`fn`/`storage slot` identifiers must not collide).
 24. Duplicate-name checks apply to event parameter lists and function return-name lists.
+25. Local `let` declarations are uniqueness-checked per lexical scope
+    (same-scope duplicates rejected; nested-scope shadowing allowed).
 
 Partially implemented:
 

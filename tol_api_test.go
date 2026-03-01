@@ -200,6 +200,26 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsDuplicateLocalLetInSameScope(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    let x: u256 = 1;
+    let x: u256 = 2;
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected duplicate local error")
+	}
+	if !strings.Contains(err.Error(), "TOL2028") {
+		t.Fatalf("expected TOL2028 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsFunctionCallArityMismatch(t *testing.T) {
 	src := []byte(`
 tol 0.2

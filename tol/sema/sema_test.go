@@ -122,6 +122,86 @@ func TestCheckSetTargetMustBeAssignable(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsDuplicateLocalLetInSameScope(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "2"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2028") {
+		t.Fatalf("expected TOL2028, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsLocalLetCollidingWithParamInSameScope(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2028") {
+		t.Fatalf("expected TOL2028, got: %v", diags)
+	}
+}
+
+func TestCheckAllowsLocalShadowingInNestedScope(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+						{
+							Kind: "if",
+							Cond: &ast.Expr{Kind: "ident", Value: "true"},
+							Then: []ast.Statement{
+								{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "2"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsSetTargetReservedLiteralIdent(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

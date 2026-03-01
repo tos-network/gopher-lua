@@ -182,6 +182,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			}
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
+			checkDuplicateLocals(filename, "function", fn.Name, fn.Params, fn.Body, &diags)
 			if len(fn.Returns) > 0 && !containsReturnValueStmt(fn.Body) {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidReturn,
@@ -197,11 +198,13 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, m.Contract.Constructor.Body, 0, &diags)
 			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
+			checkDuplicateLocals(filename, "constructor", "", m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 		}
 		if m.Contract.Fallback != nil {
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, m.Contract.Fallback.Body, 0, &diags)
 			checkReturnStatements(filename, "fallback", "", false, m.Contract.Fallback.Body, &diags)
+			checkDuplicateLocals(filename, "fallback", "", nil, m.Contract.Fallback.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, nil, m.Contract.Fallback.Body, &diags)
 		}
 	}
@@ -592,6 +595,96 @@ func containsReturnValueStmt(stmts []ast.Statement) bool {
 		}
 	}
 	return false
+}
+
+type localScope struct {
+	names map[string]struct{}
+}
+
+func checkDuplicateLocals(filename, ownerKind, ownerName string, params []ast.FieldDecl, body []ast.Statement, diags *diag.Diagnostics) {
+	scopes := []localScope{{names: map[string]struct{}{}}}
+	declare := func(name string) bool {
+		n := strings.TrimSpace(name)
+		if n == "" {
+			return true
+		}
+		cur := &scopes[len(scopes)-1]
+		if _, exists := cur.names[n]; exists {
+			return false
+		}
+		cur.names[n] = struct{}{}
+		return true
+	}
+	for _, p := range params {
+		_ = declare(p.Name)
+	}
+	checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, body, &scopes, declare, diags)
+}
+
+func checkDuplicateLocalsInStmts(
+	filename, ownerKind, ownerName string,
+	stmts []ast.Statement,
+	scopes *[]localScope,
+	declare func(string) bool,
+	diags *diag.Diagnostics,
+) {
+	push := func() {
+		*scopes = append(*scopes, localScope{names: map[string]struct{}{}})
+	}
+	pop := func() {
+		if len(*scopes) > 1 {
+			*scopes = (*scopes)[:len(*scopes)-1]
+		}
+	}
+	for _, s := range stmts {
+		if s.Kind == "let" && !declare(s.Name) {
+			subject := ownerKind
+			if ownerKind == "function" {
+				subject = fmt.Sprintf("function '%s'", ownerName)
+			}
+			*diags = append(*diags, diag.Diagnostic{
+				Code:    diag.CodeSemaDuplicateLocal,
+				Message: fmt.Sprintf("duplicate local variable '%s' in %s scope", strings.TrimSpace(s.Name), subject),
+				Span:    defaultSpan(filename),
+			})
+		}
+		switch s.Kind {
+		case "if":
+			push()
+			checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Then, scopes, declare, diags)
+			pop()
+			push()
+			checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Else, scopes, declare, diags)
+			pop()
+		case "while":
+			push()
+			checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Body, scopes, declare, diags)
+			pop()
+		case "for":
+			push()
+			if s.Init != nil {
+				checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, []ast.Statement{*s.Init}, scopes, declare, diags)
+			}
+			checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Body, scopes, declare, diags)
+			pop()
+		default:
+			if len(s.Then) > 0 {
+				push()
+				checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Then, scopes, declare, diags)
+				pop()
+			}
+			if len(s.Else) > 0 {
+				push()
+				checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Else, scopes, declare, diags)
+				pop()
+			}
+			if len(s.Body) > 0 {
+				push()
+				checkDuplicateLocalsInStmts(filename, ownerKind, ownerName, s.Body, scopes, declare, diags)
+				pop()
+			}
+		}
+	}
 }
 
 func ownerLabel(ownerKind, ownerName string) string {
