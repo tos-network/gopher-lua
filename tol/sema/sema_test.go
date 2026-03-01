@@ -244,6 +244,49 @@ func TestCheckRejectsDuplicatePublicExternalSelector(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsSelectorOverrideOnNonExternalFunction(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:             "f",
+					SelectorOverride: "0x11111111",
+					Modifiers:        []string{"internal"},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2027") {
+		t.Fatalf("expected TOL2027, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsSelectorOverrideOnExternalFunction(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:             "f",
+					SelectorOverride: "0x11111111",
+					Modifiers:        []string{"external"},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsSelectorBuiltinNonLiteral(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

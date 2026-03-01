@@ -762,6 +762,7 @@ Implemented:
     (`0x????????`).
 11. Selector member builtins are supported for externally dispatchable functions:
     `this.fn.selector` and `Contract.fn.selector`.
+    `@selector("0x........")` override is accepted only on `public`/`external` functions.
 12. Storage lowering in direct-IR path supports a deterministic core subset:
     scalar slot reads/writes, mapping reads/writes (with exact declared key depth),
     and top-level storage dynamic array `arr[i]`, `arr.length`, `arr.push(v)`.

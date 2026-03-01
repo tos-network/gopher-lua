@@ -157,6 +157,16 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 					Span:    defaultSpan(filename),
 				})
 			}
+			if fn.SelectorOverride != "" {
+				vis := funcVis[fn.Name]
+				if vis != "public" && vis != "external" {
+					diags = append(diags, diag.Diagnostic{
+						Code:    diag.CodeSemaSelectorVisibility,
+						Message: fmt.Sprintf("@selector is only allowed on public/external functions (got '%s' on '%s')", vis, fn.Name),
+						Span:    defaultSpan(filename),
+					})
+				}
+			}
 			if key, ok := selectorDispatchKey(fn); ok {
 				if prev, exists := selectorSeen[key]; exists {
 					diags = append(diags, diag.Diagnostic{

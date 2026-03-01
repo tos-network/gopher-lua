@@ -83,6 +83,7 @@ Current parser/sema coverage in this branch:
    declared-event-name resolution checks for `emit`,
    duplicate event-name checks,
    cross-namespace identifier collision checks (`event`/`fn`/`storage`),
+   selector-override visibility checks (`@selector` only on public/external),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target

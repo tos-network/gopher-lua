@@ -162,6 +162,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsSelectorOverrideOnNonExternalFunction(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  @selector("0x12345678")
+  fn f() internal {
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected selector visibility error")
+	}
+	if !strings.Contains(err.Error(), "TOL2027") {
+		t.Fatalf("expected TOL2027 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsSetTargetReservedLiteralIdent(t *testing.T) {
 	src := []byte(`
 tol 0.2
