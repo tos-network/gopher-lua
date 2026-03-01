@@ -152,3 +152,37 @@ func TestDecodeTOCRejectsBytecodeHashMismatch(t *testing.T) {
 		t.Fatalf("expected bytecode hash mismatch")
 	}
 }
+
+func TestDecodeTOCRejectsUnsupportedVersion(t *testing.T) {
+	toc, err := EncodeTOC(&TOCArtifact{
+		Version:      TOCFormatVersion + 1,
+		Compiler:     "tolang/" + PackageVersion,
+		ContractName: "Demo",
+		Bytecode:     []byte{1},
+		SourceHash:   keccak256Hex([]byte("src")),
+		BytecodeHash: keccak256Hex([]byte{1}),
+	})
+	if err != nil {
+		t.Fatalf("unexpected encode error: %v", err)
+	}
+	if _, err := DecodeTOC(toc); err == nil {
+		t.Fatalf("expected unsupported version error")
+	}
+}
+
+func TestDecodeTOCRejectsInvalidEmbeddedBytecode(t *testing.T) {
+	toc, err := EncodeTOC(&TOCArtifact{
+		Version:      TOCFormatVersion,
+		Compiler:     "tolang/" + PackageVersion,
+		ContractName: "Demo",
+		Bytecode:     []byte{1, 2, 3},
+		SourceHash:   keccak256Hex([]byte("src")),
+		BytecodeHash: keccak256Hex([]byte{1, 2, 3}),
+	})
+	if err != nil {
+		t.Fatalf("unexpected encode error: %v", err)
+	}
+	if _, err := DecodeTOC(toc); err == nil {
+		t.Fatalf("expected invalid embedded bytecode error")
+	}
+}

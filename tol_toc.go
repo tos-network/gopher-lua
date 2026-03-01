@@ -166,6 +166,9 @@ func DecodeTOC(data []byte) (*TOCArtifact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid toc version: %w", err)
 	}
+	if version != TOCFormatVersion {
+		return nil, fmt.Errorf("unsupported toc version: got=%d want=%d", version, TOCFormatVersion)
+	}
 	compiler, err := readString(r)
 	if err != nil {
 		return nil, fmt.Errorf("invalid toc compiler: %w", err)
@@ -197,9 +200,18 @@ func DecodeTOC(data []byte) (*TOCArtifact, error) {
 	if r.n != len(data) {
 		return nil, fmt.Errorf("trailing bytes in toc payload")
 	}
+	if strings.TrimSpace(contractName) == "" {
+		return nil, fmt.Errorf("toc contract name is empty")
+	}
+	if len(bytecode) == 0 {
+		return nil, fmt.Errorf("toc bytecode payload is empty")
+	}
 	gotBytecodeHash := keccak256Bytes(bytecode)
 	if !bytes.Equal(gotBytecodeHash, bytecodeHash) {
 		return nil, fmt.Errorf("toc bytecode hash mismatch")
+	}
+	if _, err := DecodeFunctionProto(bytecode); err != nil {
+		return nil, fmt.Errorf("toc embedded bytecode decode failed: %w", err)
 	}
 	return &TOCArtifact{
 		Version:           version,

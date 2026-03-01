@@ -821,7 +821,8 @@ Implemented:
 31. `.toc` packaging baseline is available in API form:
     deterministic `TOC\0` container with compiler/contract metadata,
     raw bytecode payload, ABI/storage JSON payloads, and keccak256
-    source/bytecode hashes (`DecodeTOC` verifies embedded bytecode hash).
+    source/bytecode hashes (`DecodeTOC` verifies version, embedded bytecode hash,
+    and bytecode decodability).
 
 Partially implemented:
 
