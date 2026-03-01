@@ -1644,6 +1644,48 @@ func TestCheckRejectsThisMemberCallToNonExternalFunction(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsContractMemberCallToNonExternalFunction(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:      "sum",
+					Modifiers: []string{"internal"},
+					Body:      []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "sum",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "Demo",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2032") {
+		t.Fatalf("expected TOL2032, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsInvalidAssignmentExprTarget(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

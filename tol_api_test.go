@@ -335,6 +335,26 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsContractMemberCallToNonExternalFunction(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn sum() internal { return; }
+  fn run() public {
+    Demo.sum();
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected call visibility error")
+	}
+	if !strings.Contains(err.Error(), "TOL2032") {
+		t.Fatalf("expected TOL2032 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsNonCallAssignExprStatement(t *testing.T) {
 	src := []byte(`
 tol 0.2
