@@ -76,6 +76,7 @@ Recent verifier hardening completed in this phase:
    - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
      and archive inspection
    - `-ctor` now also supports one-shot `.tol` -> `.tor` packaging
+     with one-shot package overrides (`-ctorpkg`, `-ctorver`, `-ctorsrc`)
    - CLI strict TOR validation path (`-vtor`)
 
 ---
