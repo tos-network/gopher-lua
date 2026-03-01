@@ -1,0 +1,342 @@
+tol 0.2
+
+// GTOS Agent + Task + Prediction Market protocol interface draft.
+// Scope: signatures/events/storage only (no function bodies yet).
+
+interface IAgentRegistry {
+  event AgentRegistered(agent: address indexed, metadata_uri: string, stake: u256)
+  event AgentProfileUpdated(agent: address indexed, metadata_uri: string)
+  event AgentStakeIncreased(agent: address indexed, amount: u256)
+  event AgentStakeDecreased(agent: address indexed, amount: u256)
+  event AgentStatusChanged(agent: address indexed, status: u8, reason: string)
+
+  fn register(metadata_uri: string, stake: u256) public;
+  fn updateProfile(metadata_uri: string) public;
+  fn increaseStake(amount: u256) public;
+  fn decreaseStake(amount: u256) public;
+  fn suspend(agent: address, reason: string) public;
+  fn unsuspend(agent: address, reason: string) public;
+
+  fn isRegistered(agent: address) -> (ok: bool) public view;
+  fn isSuspended(agent: address) -> (ok: bool) public view;
+  fn stakeOf(agent: address) -> (stake: u256) public view;
+  fn metadataOf(agent: address) -> (metadata_uri: string) public view;
+}
+
+interface IReputationHub {
+  event ScorerAuthorized(scorer: address indexed, enabled: bool)
+  event ReputationChanged(
+    agent: address indexed,
+    scorer: address indexed,
+    delta: i256,
+    total: i256,
+    reason: string,
+    ref_id: bytes32
+  )
+
+  fn setScorer(scorer: address, enabled: bool) public;
+  fn recordScore(agent: address, delta: i256, reason: string, ref_id: bytes32) public;
+  fn totalScoreOf(agent: address) -> (score: i256) public view;
+  fn ratingCountOf(agent: address) -> (n: u256) public view;
+}
+
+interface ITaskEscrow {
+  event TaskPosted(
+    task_id: u256 indexed,
+    poster: address indexed,
+    reward: u256,
+    deadline_ms: u64,
+    spec_hash: bytes32
+  )
+  event TaskAccepted(task_id: u256 indexed, worker: address indexed)
+  event TaskSubmitted(task_id: u256 indexed, worker: address indexed, result_hash: bytes32)
+  event TaskApproved(task_id: u256 indexed, poster: address indexed, worker: address indexed, reward: u256)
+  event TaskRejected(task_id: u256 indexed, poster: address indexed, worker: address indexed, reason: string)
+  event TaskCancelled(task_id: u256 indexed, poster: address indexed)
+  event TaskReclaimed(task_id: u256 indexed, poster: address indexed, reward: u256)
+
+  fn postTask(spec_hash: bytes32, reward: u256, deadline_ms: u64) -> (task_id: u256) public payable;
+  fn acceptTask(task_id: u256) public;
+  fn submitTask(task_id: u256, result_hash: bytes32) public;
+  fn approveTask(task_id: u256) public;
+  fn rejectTask(task_id: u256, reason: string) public;
+  fn cancelTask(task_id: u256) public;
+  fn reclaimExpired(task_id: u256) public;
+
+  fn statusOf(task_id: u256) -> (status: u8) public view;
+  fn posterOf(task_id: u256) -> (poster: address) public view;
+  fn workerOf(task_id: u256) -> (worker: address) public view;
+  fn rewardOf(task_id: u256) -> (reward: u256) public view;
+}
+
+interface IDisputeResolver {
+  event DisputeOpened(dispute_id: u256 indexed, task_id: u256 indexed, opener: address indexed, bond: u256)
+  event DisputeRuled(dispute_id: u256 indexed, winner: address indexed, reason: string)
+  event ArbitratorSet(arbitrator: address indexed, enabled: bool)
+
+  fn openDispute(task_id: u256, evidence_hash: bytes32) -> (dispute_id: u256) public payable;
+  fn submitEvidence(dispute_id: u256, evidence_hash: bytes32) public;
+  fn rule(dispute_id: u256, winner: address, slash_bps: u16, reason: string) public;
+  fn setArbitrator(arbitrator: address, enabled: bool) public;
+
+  fn statusOf(dispute_id: u256) -> (status: u8) public view;
+  fn taskIdOf(dispute_id: u256) -> (task_id: u256) public view;
+}
+
+interface IPredictionMarketFactory {
+  event MarketCreated(
+    market: address indexed,
+    creator: address indexed,
+    question_id: bytes32 indexed,
+    close_time_ms: u64,
+    oracle: address,
+    fee_bps: u16
+  )
+
+  fn createBinaryMarket(
+    question_id: bytes32,
+    close_time_ms: u64,
+    oracle: address,
+    fee_bps: u16
+  ) -> (market: address) public;
+}
+
+interface IPredictionMarket {
+  event LiquidityAdded(provider: address indexed, amount: u256, minted_shares: u256)
+  event LiquidityRemoved(provider: address indexed, burned_shares: u256, amount_out: u256)
+  event Bought(
+    trader: address indexed,
+    outcome: u8 indexed,
+    amount_in: u256,
+    shares_out: u256,
+    fee_paid: u256
+  )
+  event Sold(
+    trader: address indexed,
+    outcome: u8 indexed,
+    shares_in: u256,
+    amount_out: u256,
+    fee_paid: u256
+  )
+  event Resolved(outcome: u8 indexed, resolver: address indexed)
+  event Claimed(user: address indexed, payout: u256)
+
+  fn addLiquidity(amount: u256) public payable;
+  fn removeLiquidity(lp_shares: u256) public;
+  fn buy(outcome: u8, amount_in: u256, min_shares_out: u256) public payable;
+  fn sell(outcome: u8, shares_in: u256, min_amount_out: u256) public;
+  fn resolve(outcome: u8) public;
+  fn claim() public;
+
+  fn isResolved() -> (ok: bool) public view;
+  fn winningOutcome() -> (outcome: u8) public view;
+  fn poolOf(outcome: u8) -> (amount: u256) public view;
+  fn sharesOf(user: address, outcome: u8) -> (shares: u256) public view;
+}
+
+interface IRewardVault {
+  event RewardFunded(campaign_id: bytes32 indexed, from: address indexed, amount: u256)
+  event RewardAllocated(campaign_id: bytes32 indexed, user: address indexed, amount: u256, reason: string)
+  event RewardClaimed(campaign_id: bytes32 indexed, user: address indexed, amount: u256)
+  event SignerSet(signer: address indexed, enabled: bool)
+
+  fn fund(campaign_id: bytes32, amount: u256) public payable;
+  fn allocate(campaign_id: bytes32, user: address, amount: u256, reason: string) public;
+  fn claim(campaign_id: bytes32) public;
+  fn setSigner(signer: address, enabled: bool) public;
+
+  fn allocatedOf(campaign_id: bytes32, user: address) -> (amount: u256) public view;
+  fn claimedOf(campaign_id: bytes32, user: address) -> (amount: u256) public view;
+  fn remainingOf(campaign_id: bytes32) -> (amount: u256) public view;
+}
+
+contract AgentRegistry is IAgentRegistry {
+  storage {
+    slot admin: address;
+    slot min_stake: u256;
+    slot agent_status: mapping(address => u8);            // 0:none,1:active,2:suspended
+    slot agent_stake: mapping(address => u256);
+    slot agent_metadata: mapping(address => string);
+    slot registered_count: u256;
+  }
+
+  event AgentRegistered(agent: address indexed, metadata_uri: string, stake: u256)
+  event AgentProfileUpdated(agent: address indexed, metadata_uri: string)
+  event AgentStakeIncreased(agent: address indexed, amount: u256)
+  event AgentStakeDecreased(agent: address indexed, amount: u256)
+  event AgentStatusChanged(agent: address indexed, status: u8, reason: string)
+
+  fn register(metadata_uri: string, stake: u256) public;
+  fn updateProfile(metadata_uri: string) public;
+  fn increaseStake(amount: u256) public;
+  fn decreaseStake(amount: u256) public;
+  fn suspend(agent: address, reason: string) public;
+  fn unsuspend(agent: address, reason: string) public;
+  fn isRegistered(agent: address) -> (ok: bool) public view;
+  fn isSuspended(agent: address) -> (ok: bool) public view;
+  fn stakeOf(agent: address) -> (stake: u256) public view;
+  fn metadataOf(agent: address) -> (metadata_uri: string) public view;
+}
+
+contract ReputationHub is IReputationHub {
+  storage {
+    slot admin: address;
+    slot scorer_enabled: mapping(address => bool);
+    slot total_score: mapping(address => i256);
+    slot rating_count: mapping(address => u256);
+    slot last_ref: mapping(address => bytes32);
+  }
+
+  event ScorerAuthorized(scorer: address indexed, enabled: bool)
+  event ReputationChanged(
+    agent: address indexed,
+    scorer: address indexed,
+    delta: i256,
+    total: i256,
+    reason: string,
+    ref_id: bytes32
+  )
+
+  fn setScorer(scorer: address, enabled: bool) public;
+  fn recordScore(agent: address, delta: i256, reason: string, ref_id: bytes32) public;
+  fn totalScoreOf(agent: address) -> (score: i256) public view;
+  fn ratingCountOf(agent: address) -> (n: u256) public view;
+}
+
+contract TaskEscrow is ITaskEscrow {
+  storage {
+    slot admin: address;
+    slot registry: address;
+    slot reputation_hub: address;
+    slot dispute_resolver: address;
+    slot next_task_id: u256;
+
+    slot task_status: mapping(u256 => u8);                // 0:none,1:open,2:accepted,3:submitted,4:approved,5:rejected,6:disputed,7:cancelled,8:reclaimed
+    slot task_poster: mapping(u256 => address);
+    slot task_worker: mapping(u256 => address);
+    slot task_reward: mapping(u256 => u256);
+    slot task_deadline_ms: mapping(u256 => u64);
+    slot task_spec_hash: mapping(u256 => bytes32);
+    slot task_result_hash: mapping(u256 => bytes32);
+  }
+
+  event TaskPosted(task_id: u256 indexed, poster: address indexed, reward: u256, deadline_ms: u64, spec_hash: bytes32)
+  event TaskAccepted(task_id: u256 indexed, worker: address indexed)
+  event TaskSubmitted(task_id: u256 indexed, worker: address indexed, result_hash: bytes32)
+  event TaskApproved(task_id: u256 indexed, poster: address indexed, worker: address indexed, reward: u256)
+  event TaskRejected(task_id: u256 indexed, poster: address indexed, worker: address indexed, reason: string)
+  event TaskCancelled(task_id: u256 indexed, poster: address indexed)
+  event TaskReclaimed(task_id: u256 indexed, poster: address indexed, reward: u256)
+
+  fn postTask(spec_hash: bytes32, reward: u256, deadline_ms: u64) -> (task_id: u256) public payable;
+  fn acceptTask(task_id: u256) public;
+  fn submitTask(task_id: u256, result_hash: bytes32) public;
+  fn approveTask(task_id: u256) public;
+  fn rejectTask(task_id: u256, reason: string) public;
+  fn cancelTask(task_id: u256) public;
+  fn reclaimExpired(task_id: u256) public;
+  fn statusOf(task_id: u256) -> (status: u8) public view;
+  fn posterOf(task_id: u256) -> (poster: address) public view;
+  fn workerOf(task_id: u256) -> (worker: address) public view;
+  fn rewardOf(task_id: u256) -> (reward: u256) public view;
+}
+
+contract DisputeResolver is IDisputeResolver {
+  storage {
+    slot admin: address;
+    slot escrow: address;
+    slot arbitrator_enabled: mapping(address => bool);
+    slot next_dispute_id: u256;
+
+    slot dispute_status: mapping(u256 => u8);             // 0:none,1:open,2:ruled
+    slot dispute_task_id: mapping(u256 => u256);
+    slot dispute_opener: mapping(u256 => address);
+    slot dispute_bond: mapping(u256 => u256);
+    slot dispute_winner: mapping(u256 => address);
+  }
+
+  event DisputeOpened(dispute_id: u256 indexed, task_id: u256 indexed, opener: address indexed, bond: u256)
+  event DisputeRuled(dispute_id: u256 indexed, winner: address indexed, reason: string)
+  event ArbitratorSet(arbitrator: address indexed, enabled: bool)
+
+  fn openDispute(task_id: u256, evidence_hash: bytes32) -> (dispute_id: u256) public payable;
+  fn submitEvidence(dispute_id: u256, evidence_hash: bytes32) public;
+  fn rule(dispute_id: u256, winner: address, slash_bps: u16, reason: string) public;
+  fn setArbitrator(arbitrator: address, enabled: bool) public;
+  fn statusOf(dispute_id: u256) -> (status: u8) public view;
+  fn taskIdOf(dispute_id: u256) -> (task_id: u256) public view;
+}
+
+contract PredictionMarketFactory is IPredictionMarketFactory {
+  storage {
+    slot admin: address;
+    slot market_impl: address;
+    slot market_count: u256;
+    slot market_by_question: mapping(bytes32 => address);
+    slot fee_recipient: address;
+  }
+
+  event MarketCreated(market: address indexed, creator: address indexed, question_id: bytes32 indexed, close_time_ms: u64, oracle: address, fee_bps: u16)
+
+  fn createBinaryMarket(question_id: bytes32, close_time_ms: u64, oracle: address, fee_bps: u16) -> (market: address) public;
+}
+
+contract PredictionMarket is IPredictionMarket {
+  storage {
+    slot factory: address;
+    slot oracle: address;
+    slot fee_recipient: address;
+    slot question_id: bytes32;
+    slot close_time_ms: u64;
+    slot fee_bps: u16;
+
+    slot resolved: bool;
+    slot winning_outcome: u8;                             // 0 or 1
+    slot pool: mapping(u8 => u256);                       // outcome -> collateral pool
+    slot shares: mapping(address => mapping(u8 => u256)); // user -> outcome -> shares
+    slot lp_shares: mapping(address => u256);
+    slot total_lp_shares: u256;
+    slot claimed: mapping(address => bool);
+  }
+
+  event LiquidityAdded(provider: address indexed, amount: u256, minted_shares: u256)
+  event LiquidityRemoved(provider: address indexed, burned_shares: u256, amount_out: u256)
+  event Bought(trader: address indexed, outcome: u8 indexed, amount_in: u256, shares_out: u256, fee_paid: u256)
+  event Sold(trader: address indexed, outcome: u8 indexed, shares_in: u256, amount_out: u256, fee_paid: u256)
+  event Resolved(outcome: u8 indexed, resolver: address indexed)
+  event Claimed(user: address indexed, payout: u256)
+
+  fn addLiquidity(amount: u256) public payable;
+  fn removeLiquidity(lp_shares: u256) public;
+  fn buy(outcome: u8, amount_in: u256, min_shares_out: u256) public payable;
+  fn sell(outcome: u8, shares_in: u256, min_amount_out: u256) public;
+  fn resolve(outcome: u8) public;
+  fn claim() public;
+  fn isResolved() -> (ok: bool) public view;
+  fn winningOutcome() -> (outcome: u8) public view;
+  fn poolOf(outcome: u8) -> (amount: u256) public view;
+  fn sharesOf(user: address, outcome: u8) -> (shares: u256) public view;
+}
+
+contract RewardVault is IRewardVault {
+  storage {
+    slot admin: address;
+    slot signer_enabled: mapping(address => bool);
+    slot campaign_fund: mapping(bytes32 => u256);
+    slot allocated: mapping(bytes32 => mapping(address => u256));
+    slot claimed: mapping(bytes32 => mapping(address => u256));
+  }
+
+  event RewardFunded(campaign_id: bytes32 indexed, from: address indexed, amount: u256)
+  event RewardAllocated(campaign_id: bytes32 indexed, user: address indexed, amount: u256, reason: string)
+  event RewardClaimed(campaign_id: bytes32 indexed, user: address indexed, amount: u256)
+  event SignerSet(signer: address indexed, enabled: bool)
+
+  fn fund(campaign_id: bytes32, amount: u256) public payable;
+  fn allocate(campaign_id: bytes32, user: address, amount: u256, reason: string) public;
+  fn claim(campaign_id: bytes32) public;
+  fn setSigner(signer: address, enabled: bool) public;
+  fn allocatedOf(campaign_id: bytes32, user: address) -> (amount: u256) public view;
+  fn claimedOf(campaign_id: bytes32, user: address) -> (amount: u256) public view;
+  fn remainingOf(campaign_id: bytes32) -> (amount: u256) public view;
+}
