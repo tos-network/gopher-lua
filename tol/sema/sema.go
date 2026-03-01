@@ -1338,6 +1338,16 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 					Span:    defaultSpan(filename),
 				})
 			}
+			root := stripParens(e.Callee)
+			if root != nil && root.Kind == "ident" {
+				if vis, exists := funcVis[name]; exists && vis == "external" {
+					*diags = append(*diags, diag.Diagnostic{
+						Code:    diag.CodeSemaCallVisibility,
+						Message: fmt.Sprintf("direct call target function '%s' is external-only; use contract-scoped dispatch call", name),
+						Span:    defaultSpan(filename),
+					})
+				}
+			}
 		}
 		if name, ok := scopedContractMemberCallName(contractName, e.Callee); ok {
 			if _, exists := funcArity[name]; !exists {

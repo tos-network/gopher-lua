@@ -35,6 +35,7 @@ Recent verifier hardening completed in this phase:
    - parenthesized selector-member forms are normalized (`(this.fn).selector`, `(Contract.fn).selector`)
 2. Contract-scope call checks:
    - local call arity checks for `fn(...)`, `this.fn(...)`, `Contract.fn(...)`
+   - direct-call visibility check (`fn(...)` cannot target `external`)
    - contract member-call target existence + visibility checks
 3. Control-flow and statement checks:
    - return-shape checks and structured-path non-void return coverage

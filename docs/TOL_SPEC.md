@@ -780,6 +780,8 @@ Implemented:
 15. Early semantic verifier validates local contract-call arity
     (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`) and assignment-expression
     target assignability in expression context.
+    Direct unscoped calls `fn(...)` cannot target `external` functions
+    in current verifier stage.
     Assignment targets using literal identifiers (`true`/`false`/`nil`) are rejected.
     Selector-member targets (`*.selector`) are read-only and rejected as lvalues.
 16. Early semantic verifier restricts assignment-expression placement to supported
