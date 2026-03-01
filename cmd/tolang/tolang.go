@@ -190,10 +190,15 @@ func mainAux() int {
 					fmt.Println(err.Error())
 					return 1
 				}
+				if _, err := lua.DecodeFunctionProto(toc.Bytecode); err != nil {
+					fmt.Printf("invalid embedded bytecode: %v\n", err)
+					return 1
+				}
 				fmt.Printf("TOC version: %d\n", toc.Version)
 				fmt.Printf("Compiler: %s\n", toc.Compiler)
 				fmt.Printf("Contract: %s\n", toc.ContractName)
 				fmt.Printf("Bytecode bytes: %d\n", len(toc.Bytecode))
+				fmt.Printf("Bytecode decode: ok\n")
 				fmt.Printf("Source hash: %s\n", toc.SourceHash)
 				fmt.Printf("Bytecode hash: %s\n", toc.BytecodeHash)
 				if len(toc.ABIJSON) > 0 {
