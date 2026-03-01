@@ -810,6 +810,8 @@ Implemented:
     resolve to declared contract functions and target `public/external` functions only.
 29. Function name `selector` is reserved for builtin `selector("...")` and
     cannot be declared as a contract function name.
+30. Function names using internal prefix `__tol_` are reserved and cannot
+    be declared in contract source.
 
 Partially implemented:
 

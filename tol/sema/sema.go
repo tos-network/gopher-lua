@@ -132,10 +132,18 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		funcSeen := map[string]struct{}{}
 		selectorSeen := map[string]string{}
 		for _, fn := range m.Contract.Functions {
-			if strings.TrimSpace(fn.Name) == "selector" {
+			name := strings.TrimSpace(fn.Name)
+			if name == "selector" {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaReservedName,
 					Message: "function name 'selector' is reserved for builtin selector(...)",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if strings.HasPrefix(name, "__tol_") {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaReservedName,
+					Message: fmt.Sprintf("function name '%s' uses reserved internal prefix '__tol_'", name),
 					Span:    defaultSpan(filename),
 				})
 			}
