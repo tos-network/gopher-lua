@@ -782,6 +782,7 @@ Implemented:
     current verifier stage (conservative return-shape enforcement).
 18. Statement-shape checks enforce current subset contracts:
     `require/assert` must carry expression payload; `emit` must carry identifier-call payload.
+    `selector("...")` is expression-only and cannot appear as standalone statement.
 19. `revert` payload is constrained to empty or string-literal form in current stage.
 20. For declared events, `emit EventName(...)` argument count is verifier-checked
     against the declaration arity.

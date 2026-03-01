@@ -78,6 +78,7 @@ Current parser/sema coverage in this branch:
    assignment-expression placement checks (value-context rejection),
    non-void function value-return presence checks (current conservative rule),
    statement-shape checks for current subset (`require/assert` payload, `emit` identifier-call payload),
+   expression-only builtin statement rejection (`selector(...)` standalone/post usage),
    `revert` payload shape checks (empty or string literal in current stage),
    declared-event `emit` arity checks,
    declared-event-name resolution checks for `emit`,

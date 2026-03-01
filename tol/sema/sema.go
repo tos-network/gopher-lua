@@ -377,6 +377,13 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
+			if isSelectorBuiltinCallExpr(s.Post) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidStmtShape,
+					Message: "selector(...) cannot be used as for post expression statement",
+					Span:    defaultSpan(filename),
+				})
+			}
 			if hasIllegalNestedAssignInStmtExpr(s.Post) {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidAssignExpr,
@@ -397,6 +404,13 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidAssignExpr,
 					Message: "nested assignment expressions are not allowed in expression statement",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if isSelectorBuiltinCallExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidStmtShape,
+					Message: "selector(...) cannot be used as standalone expression statement",
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -424,6 +438,15 @@ func isExprStatementExpr(e *ast.Expr) bool {
 func isCallExpr(e *ast.Expr) bool {
 	root := stripParens(e)
 	return root != nil && root.Kind == "call"
+}
+
+func isSelectorBuiltinCallExpr(e *ast.Expr) bool {
+	root := stripParens(e)
+	if root == nil || root.Kind != "call" {
+		return false
+	}
+	callee := stripParens(root.Callee)
+	return callee != nil && callee.Kind == "ident" && strings.TrimSpace(callee.Value) == "selector"
 }
 
 func isSelectorMemberExpr(e *ast.Expr) bool {
