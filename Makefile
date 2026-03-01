@@ -1,10 +1,12 @@
-.PHONY: build test tolang lua54-subset-test
+.PHONY: build test tol tolang lua54-subset-test
 
 build:
 	./_tools/go-inline *.go && go fmt . &&  go build
 
-tolang: *.go pm/*.go cmd/tolang/tolang.go
-	./_tools/go-inline *.go && go fmt . && go build cmd/tolang/tolang.go
+tol: *.go pm/*.go cmd/tolang/*.go
+	./_tools/go-inline *.go && go fmt . && go build -o tol ./cmd/tolang
+
+tolang: tol
 
 test:
 	./_tools/go-inline *.go && go fmt . &&  go test

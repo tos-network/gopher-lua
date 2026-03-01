@@ -23,6 +23,10 @@ func main() {
 }
 
 func mainAux() int {
+	if handled, status := dispatchSubcommand(os.Args[1:]); handled {
+		return status
+	}
+
 	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver, opt_ctorifacename string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoi, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_vtoi, opt_ctorsrc bool
 	flag.StringVar(&opt_e, "e", "", "")
@@ -55,7 +59,17 @@ func mainAux() int {
 	flag.BoolVar(&opt_vtoi, "vtoi", false, "")
 	flag.BoolVar(&opt_ctorsrc, "ctorsrc", false, "")
 	flag.Usage = func() {
-		fmt.Println(`Usage: tolang [options] [script [args]].
+		fmt.Println(`Usage:
+  tol <subcommand> [flags] <inputs...>
+  tol [options] [script [args]]
+
+Subcommands:
+  compile   compile .tol source to .toc/.toi/.tor
+  pack      package a directory with manifest.json into .tor
+  inspect   inspect .toc/.toi/.tor metadata
+  verify    verify .toc/.toi/.tor integrity
+
+Legacy Lua/VM options are preserved:
 	Available options are:
 	  -e stat  execute string 'stat'
 	  -l name  require library 'name'

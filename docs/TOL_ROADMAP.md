@@ -24,7 +24,7 @@ Milestone progress snapshot:
 9. `M8` - Not started.
 10. `M9` - Not started.
 11. `M10` - Not started.
-12. `M-lib` - In progress (baseline `.toc` API encode/decode + compile path landed; CLI/package archive pending).
+12. `M-lib` - In progress (`.toc/.toi/.tor` core APIs landed; `tol compile/pack/inspect/verify` subcommands landed; registry install/publish pending).
 13. `M-stdlib` - Not started (full OZ-equivalent standard library).
 14. `M-registry` - Not started (on-chain package registry).
 

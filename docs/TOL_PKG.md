@@ -21,33 +21,26 @@ Scope: File formats, package layout, standard library, and on-chain registry
   contract names must be unique;
   `DecodeTOR` validates embedded `.toc`/`.toi` entries)
 
-### CLI (current — flat-flag style, to be migrated)
+### CLI (landed subcommands; legacy flags still supported)
 
-The current `tolang` binary uses a flat-flag scheme that conflates action + format
-into a single opaque flag (`-ctoc`, `-dtocj`, `-vtor`, etc.). This style is
-**not ergonomic** and will be replaced by the subcommand design specified in §7.
+The `tol` CLI now supports subcommands in the style specified in §7:
 
 ```sh
-# current (legacy, pending migration)
-tolang -ctoc out.toc input.tol
-tolang -ctoi out.toi input.tol
-tolang -dtoi interface.toi
-tolang -dtoc artifact.toc
-tolang -dtocj artifact.toc
-tolang -vtoc artifact.toc
-tolang -vtoc -vtocsrc source.tol artifact.toc
-tolang -vtoi interface.toi
-tolang -ctor out.tor <dir_or_file.tol>
-tolang -ctorpkg name -ctorver 1.0.0 -ctorifacename X -ctorsrc -ctor out.tor input.tol
-tolang -dtor artifact.tor
-tolang -dtorj artifact.tor
-tolang -vtor artifact.tor
+tol compile trc20.tol
+tol compile --emit toi -o ITRC20.toi trc20.tol
+tol compile --emit tor -o trc20.tor trc20.tol
+tol pack -o trc20-base-1.0.0.tor ./contracts/
+tol inspect trc20.toc
+tol inspect --json trc20-base-1.0.0.tor
+tol verify trc20.toc
+tol verify --source trc20.tol trc20.toc
 ```
+
+Legacy flat flags (`tolang -ctoc/-dtocj/-vtor/...`) are kept for compatibility.
 
 ### Not landed yet
 
 - `.toi` import / type-check flow in the compiler
-- Subcommand CLI (`tol compile`, `tol inspect`, `tol verify`, `tol pack`)
 - Registry resolution (`tor://...`, `toc://...`) and `tol install` / `tol publish`
 
 ---
