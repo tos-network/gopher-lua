@@ -3,6 +3,7 @@ package lua
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"testing"
 )
 
@@ -200,5 +201,79 @@ func TestTORPackageHashStable(t *testing.T) {
 	}
 	if TORPackageHash(torA) != TORPackageHash(torB) {
 		t.Fatalf("expected stable tor package hash")
+	}
+}
+
+func TestCompileTOLToTORRoundTrip(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	tor, err := CompileTOLToTOR(src, "demo.tol", &TORCompileOptions{
+		PackageName:    "demo",
+		PackageVersion: "1.0.0",
+		IncludeSource:  true,
+	})
+	if err != nil {
+		t.Fatalf("compile tor: %v", err)
+	}
+	decoded, err := DecodeTOR(tor)
+	if err != nil {
+		t.Fatalf("decode tor: %v", err)
+	}
+	var manifest struct {
+		Name      string `json:"name"`
+		Version   string `json:"version"`
+		Contracts []struct {
+			Name string `json:"name"`
+			TOC  string `json:"toc"`
+			TOI  string `json:"toi"`
+		} `json:"contracts"`
+	}
+	if err := json.Unmarshal(decoded.ManifestJSON, &manifest); err != nil {
+		t.Fatalf("manifest decode: %v", err)
+	}
+	if manifest.Name != "demo" || manifest.Version != "1.0.0" {
+		t.Fatalf("unexpected manifest identity: %+v", manifest)
+	}
+	if len(manifest.Contracts) != 1 {
+		t.Fatalf("unexpected contract entries: %d", len(manifest.Contracts))
+	}
+	ref := manifest.Contracts[0]
+	if _, ok := decoded.Files[ref.TOC]; !ok {
+		t.Fatalf("missing referenced toc file: %s", ref.TOC)
+	}
+	if _, ok := decoded.Files[ref.TOI]; !ok {
+		t.Fatalf("missing referenced toi file: %s", ref.TOI)
+	}
+	if got := string(decoded.Files["sources/demo.tol"]); got == "" {
+		t.Fatalf("expected included source file")
+	}
+}
+
+func TestCompileTOLToTORDeterministic(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	opts := &TORCompileOptions{
+		PackageName:    "demo",
+		PackageVersion: "1.0.0",
+		IncludeSource:  true,
+	}
+	a, err := CompileTOLToTOR(src, "demo.tol", opts)
+	if err != nil {
+		t.Fatalf("compile tor a: %v", err)
+	}
+	b, err := CompileTOLToTOR(src, "demo.tol", opts)
+	if err != nil {
+		t.Fatalf("compile tor b: %v", err)
+	}
+	if !bytes.Equal(a, b) {
+		t.Fatalf("expected deterministic tor output")
 	}
 }

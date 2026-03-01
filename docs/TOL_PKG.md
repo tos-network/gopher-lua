@@ -13,6 +13,7 @@ Currently landed in `tolang`:
 - API:
   - `CompileTOLToTOI(source, name)` -> compile `.tol` to textual `.toi`
   - `CompileTOLToTOC(source, name)` -> compile `.tol` to deterministic `.toc`
+  - `CompileTOLToTOR(source, name, opts)` -> compile `.tol` to minimal `.tor`
   - `EncodeTOC(...)` / `DecodeTOC(...)`
   - `VerifyTOCSourceHash(toc, sourceBytes)`
   - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`

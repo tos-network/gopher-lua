@@ -759,7 +759,7 @@ Implemented:
 8. Toolchain exists:
    - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOI`, `BuildTOIFromModule`, `CompileTOLToTOC`,
      `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`,
-     `EncodeTOR`, `DecodeTOR`, `TORPackageHash`
+     `EncodeTOR`, `DecodeTOR`, `TORPackageHash`, `CompileTOLToTOR`
    - CLI: `tolang -ctol`, `tolang -ctoi`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
      `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
      `tolang -ctor`, `tolang -dtor`, `tolang -dtorj`, and `tolang -vtor`

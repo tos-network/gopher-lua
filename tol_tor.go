@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +23,16 @@ var torDeterministicModTime = time.Date(1980, time.January, 1, 0, 0, 0, 0, time.
 type TORArtifact struct {
 	ManifestJSON []byte
 	Files        map[string][]byte // excludes manifest.json
+}
+
+// TORCompileOptions configures one-shot .tol -> .tor compilation.
+type TORCompileOptions struct {
+	PackageName    string
+	PackageVersion string
+	TOCPath        string
+	TOIPath        string
+	IncludeSource  bool
+	SourcePath     string
 }
 
 // IsTOR reports whether input starts with local-file ZIP magic.
@@ -40,6 +51,100 @@ func IsTOR(data []byte) bool {
 // TORPackageHash computes keccak256 hash of a .tor archive.
 func TORPackageHash(data []byte) string {
 	return keccak256Hex(data)
+}
+
+// CompileTOLToTOR compiles source into a minimal deterministic .tor package.
+func CompileTOLToTOR(source []byte, name string, opts *TORCompileOptions) ([]byte, error) {
+	mod, err := ParseTOLModule(source, name)
+	if err != nil {
+		return nil, err
+	}
+	if mod == nil || mod.Contract == nil || strings.TrimSpace(mod.Contract.Name) == "" {
+		return nil, fmt.Errorf("tor compile requires contract declaration")
+	}
+	contractName := strings.TrimSpace(mod.Contract.Name)
+
+	toc, err := CompileTOLToTOC(source, name)
+	if err != nil {
+		return nil, err
+	}
+	toi, err := BuildTOIFromModule(mod)
+	if err != nil {
+		return nil, err
+	}
+
+	pkgName := strings.ToLower(contractName)
+	pkgVersion := "0.1.0"
+	tocPath := fmt.Sprintf("bytecode/%s.toc", contractName)
+	toiPath := fmt.Sprintf("interfaces/I%s.toi", contractName)
+	includeSource := false
+	sourcePath := ""
+
+	if opts != nil {
+		if strings.TrimSpace(opts.PackageName) != "" {
+			pkgName = strings.TrimSpace(opts.PackageName)
+		}
+		if strings.TrimSpace(opts.PackageVersion) != "" {
+			pkgVersion = strings.TrimSpace(opts.PackageVersion)
+		}
+		if strings.TrimSpace(opts.TOCPath) != "" {
+			tocPath = strings.TrimSpace(opts.TOCPath)
+		}
+		if strings.TrimSpace(opts.TOIPath) != "" {
+			toiPath = strings.TrimSpace(opts.TOIPath)
+		}
+		includeSource = opts.IncludeSource
+		sourcePath = strings.TrimSpace(opts.SourcePath)
+	}
+	if includeSource {
+		if sourcePath == "" {
+			base := filepath.Base(name)
+			if base == "." || base == "/" || base == string(filepath.Separator) || base == "" {
+				base = contractName + ".tol"
+			}
+			sourcePath = "sources/" + base
+		}
+	}
+
+	manifest := struct {
+		Name       string `json:"name"`
+		Version    string `json:"version"`
+		TOLVersion string `json:"tol_version"`
+		Compiler   string `json:"compiler"`
+		Contracts  []struct {
+			Name string `json:"name"`
+			TOC  string `json:"toc"`
+			TOI  string `json:"toi"`
+		} `json:"contracts"`
+	}{
+		Name:       pkgName,
+		Version:    pkgVersion,
+		TOLVersion: strings.TrimSpace(mod.Version),
+		Compiler:   "tolang/" + PackageVersion,
+		Contracts: []struct {
+			Name string `json:"name"`
+			TOC  string `json:"toc"`
+			TOI  string `json:"toi"`
+		}{
+			{Name: contractName, TOC: tocPath, TOI: toiPath},
+		},
+	}
+	if manifest.TOLVersion == "" {
+		manifest.TOLVersion = "0.2"
+	}
+	manifestJSON, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, err
+	}
+
+	files := map[string][]byte{
+		tocPath: toc,
+		toiPath: toi,
+	}
+	if includeSource {
+		files[sourcePath] = source
+	}
+	return EncodeTOR(manifestJSON, files)
 }
 
 // EncodeTOR serializes manifest + files into deterministic .tor bytes.

@@ -130,7 +130,7 @@ Current parser/sema coverage in this branch:
    decode path performs strict integrity checks (including metadata JSON validity)
    before returning artifact data.
    Packaging API now also includes deterministic `.tor` archive pack/unpack
-   (`EncodeTOR` / `DecodeTOR` / `TORPackageHash`) with canonical entry ordering
+   (`EncodeTOR` / `DecodeTOR` / `TORPackageHash` / `CompileTOLToTOR`) with canonical entry ordering
    and safe-path validation; manifest contract file references are checked,
    and `DecodeTOR` validates embedded `.toc` entries.
    Storage lowering in this direct-IR path now supports deterministic subset
