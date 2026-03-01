@@ -793,6 +793,7 @@ Implemented:
     `emit` must carry identifier-call payload.
     `selector("...")` is expression-only and cannot appear as standalone statement
     or as `emit` payload target.
+    Unknown/unsupported statement kinds are rejected in current verifier stage.
 19. `revert` payload is constrained to empty or string-literal form in current stage.
 20. For declared events, `emit EventName(...)` argument count is verifier-checked
     against the declaration arity.

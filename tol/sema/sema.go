@@ -522,9 +522,11 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				})
 			}
 		default:
-			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Then, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Else, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Body, loopDepth, diags)
+			*diags = append(*diags, diag.Diagnostic{
+				Code:    diag.CodeSemaInvalidStmtShape,
+				Message: fmt.Sprintf("unsupported statement kind '%s' in current verifier stage", s.Kind),
+				Span:    defaultSpan(filename),
+			})
 		}
 	}
 }

@@ -2156,6 +2156,30 @@ func TestCheckRejectsNonCallAssignExprStatement(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsUnknownStatementKind(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{Kind: "unknown_stmt"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsSelectorBuiltinExprStatement(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
