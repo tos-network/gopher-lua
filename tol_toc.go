@@ -197,6 +197,10 @@ func DecodeTOC(data []byte) (*TOCArtifact, error) {
 	if r.n != len(data) {
 		return nil, fmt.Errorf("trailing bytes in toc payload")
 	}
+	gotBytecodeHash := keccak256Bytes(bytecode)
+	if !bytes.Equal(gotBytecodeHash, bytecodeHash) {
+		return nil, fmt.Errorf("toc bytecode hash mismatch")
+	}
 	return &TOCArtifact{
 		Version:           version,
 		Compiler:          compiler,

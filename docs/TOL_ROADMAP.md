@@ -59,6 +59,7 @@ Recent verifier hardening completed in this phase:
    - CLI output path `tolang -ctoc <out.toc> <input.tol>`
    - CLI metadata dump path `tolang -dtoc <artifact.toc>`
    - source/bytecode keccak256 hash embedding and roundtrip tests
+   - decode-time bytecode-hash integrity validation
 
 ---
 

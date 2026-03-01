@@ -135,3 +135,20 @@ func TestEncodeTOCRejectsInvalidHash(t *testing.T) {
 		t.Fatalf("expected invalid hash error")
 	}
 }
+
+func TestDecodeTOCRejectsBytecodeHashMismatch(t *testing.T) {
+	toc, err := EncodeTOC(&TOCArtifact{
+		Version:      TOCFormatVersion,
+		Compiler:     "tolang/" + PackageVersion,
+		ContractName: "Demo",
+		Bytecode:     []byte{1, 2, 3},
+		SourceHash:   keccak256Hex([]byte("src")),
+		BytecodeHash: keccak256Hex([]byte{9}),
+	})
+	if err != nil {
+		t.Fatalf("unexpected encode error: %v", err)
+	}
+	if _, err := DecodeTOC(toc); err == nil {
+		t.Fatalf("expected bytecode hash mismatch")
+	}
+}
