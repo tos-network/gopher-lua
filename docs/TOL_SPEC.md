@@ -759,7 +759,7 @@ Implemented:
 8. Toolchain exists:
    - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOC`,
      `EncodeTOC`, `DecodeTOC`
-   - CLI: `tolang -ctol` and `tolang -dtol`
+   - CLI: `tolang -ctol`, `tolang -ctoc`, and `tolang -dtol`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
 10. `selector("sig")` literal calls are lowered as compile-time selector constants

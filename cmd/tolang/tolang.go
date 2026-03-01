@@ -18,13 +18,14 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol string
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
 	flag.StringVar(&opt_c, "c", "", "")
 	flag.StringVar(&opt_ctol, "ctol", "", "")
+	flag.StringVar(&opt_ctoc, "ctoc", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
 	flag.BoolVar(&opt_dt, "dt", false, "")
@@ -39,6 +40,7 @@ func mainAux() int {
 	  -l name  require library 'name'
 	  -c file  compile source script to bytecode file
 	  -ctol file  compile TOL source script to bytecode file (skeleton path)
+	  -ctoc file  compile TOL source script to .toc artifact file
 	  -bc      treat input script as bytecode
 	  -dt      dump AST trees
 	  -dc      dump VM codes
@@ -61,12 +63,16 @@ func mainAux() int {
 	if len(opt_e) == 0 && !opt_i && !opt_v && flag.NArg() == 0 {
 		opt_i = true
 	}
-	if len(opt_c) > 0 && len(opt_ctol) > 0 {
-		fmt.Println("cannot use -c and -ctol together")
+	if len(opt_c) > 0 && (len(opt_ctol) > 0 || len(opt_ctoc) > 0) {
+		fmt.Println("cannot use -c with -ctol/-ctoc together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || opt_dtol) {
-		fmt.Println("-bc cannot be combined with -ctol or -dtol")
+	if len(opt_ctol) > 0 && len(opt_ctoc) > 0 {
+		fmt.Println("cannot use -ctol and -ctoc together")
+		return 1
+	}
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || opt_dtol) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoc, or -dtol")
 		return 1
 	}
 
@@ -127,6 +133,28 @@ func mainAux() int {
 			return 1
 		}
 		if err := os.WriteFile(opt_ctol, bc, 0o644); err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		return 0
+	}
+	if len(opt_ctoc) > 0 {
+		if flag.NArg() == 0 {
+			fmt.Println("TOL .toc compile mode requires an input source script")
+			return 1
+		}
+		input := flag.Arg(0)
+		src, err := os.ReadFile(input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		toc, err := lua.CompileTOLToTOC(src, input)
+		if err != nil {
+			fmt.Println(err.Error())
+			return 1
+		}
+		if err := os.WriteFile(opt_ctoc, toc, 0o644); err != nil {
 			fmt.Println(err.Error())
 			return 1
 		}

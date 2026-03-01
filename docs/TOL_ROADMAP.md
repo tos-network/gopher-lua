@@ -56,6 +56,7 @@ Recent verifier hardening completed in this phase:
 6. Packaging baseline:
    - deterministic `.toc` artifact encode/decode API (`TOC\0` magic)
    - compile path `CompileTOLToTOC` with ABI/storage metadata payloads
+   - CLI output path `tolang -ctoc <out.toc> <input.tol>`
    - source/bytecode keccak256 hash embedding and roundtrip tests
 
 ---
