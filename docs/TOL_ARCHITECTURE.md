@@ -123,6 +123,9 @@ Current parser/sema coverage in this branch:
      `public/external` functions (default `keccak4(signature)` in
      `0x????????` form, supports `@selector("0x........")` override),
      fallback, or deterministic `UNKNOWN_SELECTOR`.
+   Public API now also includes deterministic `.toc` artifact packing/unpacking
+   (`CompileTOLToTOC` / `EncodeTOC` / `DecodeTOC`) with `TOC\0` magic,
+   metadata, ABI/storage JSON payloads, and keccak256 source/bytecode hashes.
    Storage lowering in this direct-IR path now supports deterministic subset
    operations (scalar/mapping/array core access), while canonical slot hashing
    and persistent host-backed storage semantics remain to be completed.

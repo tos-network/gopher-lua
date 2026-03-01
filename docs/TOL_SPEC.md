@@ -757,7 +757,8 @@ Implemented:
    and `@selector("0x........")` override.
 7. Constructor hook works and forwards runtime args via `tos.oncreate(...)`.
 8. Toolchain exists:
-   - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`
+   - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOC`,
+     `EncodeTOC`, `DecodeTOC`
    - CLI: `tolang -ctol` and `tolang -dtol`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
@@ -817,6 +818,10 @@ Implemented:
     or contract member names.
 30. Names using internal prefix `__tol_` are reserved and cannot be declared
     as contract name or contract member names.
+31. `.toc` packaging baseline is available in API form:
+    deterministic `TOC\0` container with compiler/contract metadata,
+    raw bytecode payload, ABI/storage JSON payloads, and keccak256
+    source/bytecode hashes.
 
 Partially implemented:
 

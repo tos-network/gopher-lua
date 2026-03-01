@@ -24,7 +24,7 @@ Milestone progress snapshot:
 9. `M8` - Not started.
 10. `M9` - Not started.
 11. `M10` - Not started.
-12. `M-lib` - Not started (package format + CLI).
+12. `M-lib` - In progress (baseline `.toc` API encode/decode + compile path landed; CLI/package archive pending).
 13. `M-stdlib` - Not started (full OZ-equivalent standard library).
 14. `M-registry` - Not started (on-chain package registry).
 
@@ -53,6 +53,10 @@ Recent verifier hardening completed in this phase:
 5. Event and revert checks:
    - declared-event resolution + arity checks for `emit`
    - revert payload shape checks (empty or valid string literal)
+6. Packaging baseline:
+   - deterministic `.toc` artifact encode/decode API (`TOC\0` magic)
+   - compile path `CompileTOLToTOC` with ABI/storage metadata payloads
+   - source/bytecode keccak256 hash embedding and roundtrip tests
 
 ---
 

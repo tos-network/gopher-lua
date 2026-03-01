@@ -1,0 +1,137 @@
+package lua
+
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+)
+
+func TestCompileTOLToTOCRoundTrip(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot total: u256;
+    slot balances: mapping(address => u256);
+  }
+
+  event Tick(v: u256);
+
+  fn ping(owner: address, amount: u256) public {
+    return;
+  }
+}
+`)
+	toc, err := CompileTOLToTOC(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected toc compile error: %v", err)
+	}
+	if !IsTOC(toc) {
+		t.Fatalf("expected toc magic")
+	}
+
+	art, err := DecodeTOC(toc)
+	if err != nil {
+		t.Fatalf("unexpected toc decode error: %v", err)
+	}
+	if art.Version != TOCFormatVersion {
+		t.Fatalf("unexpected toc version: got=%d want=%d", art.Version, TOCFormatVersion)
+	}
+	if art.ContractName != "Demo" {
+		t.Fatalf("unexpected contract name: %q", art.ContractName)
+	}
+	if art.SourceHash != keccak256Hex(src) {
+		t.Fatalf("unexpected source hash: got=%s want=%s", art.SourceHash, keccak256Hex(src))
+	}
+	if art.BytecodeHash != keccak256Hex(art.Bytecode) {
+		t.Fatalf("unexpected bytecode hash: got=%s want=%s", art.BytecodeHash, keccak256Hex(art.Bytecode))
+	}
+	if _, err := DecodeFunctionProto(art.Bytecode); err != nil {
+		t.Fatalf("decoded toc contains invalid bytecode: %v", err)
+	}
+
+	var abi struct {
+		Functions []struct {
+			Name       string   `json:"name"`
+			Visibility string   `json:"visibility"`
+			Selector   string   `json:"selector"`
+			Params     []string `json:"params"`
+		} `json:"functions"`
+		Events []struct {
+			Name string `json:"name"`
+		} `json:"events"`
+	}
+	if err := json.Unmarshal(art.ABIJSON, &abi); err != nil {
+		t.Fatalf("invalid abi json: %v", err)
+	}
+	if len(abi.Functions) != 1 {
+		t.Fatalf("unexpected abi function count: %d", len(abi.Functions))
+	}
+	if abi.Functions[0].Name != "ping" {
+		t.Fatalf("unexpected function name: %q", abi.Functions[0].Name)
+	}
+	wantSel := selectorHexFromSignatureForTOC("ping", []string{"address", "u256"})
+	if abi.Functions[0].Selector != wantSel {
+		t.Fatalf("unexpected function selector: got=%s want=%s", abi.Functions[0].Selector, wantSel)
+	}
+	if len(abi.Events) != 1 || abi.Events[0].Name != "Tick" {
+		t.Fatalf("unexpected abi events: %+v", abi.Events)
+	}
+
+	var storage struct {
+		Slots []struct {
+			Name          string `json:"name"`
+			Type          string `json:"type"`
+			CanonicalHash string `json:"canonical_hash"`
+		} `json:"slots"`
+	}
+	if err := json.Unmarshal(art.StorageLayoutJSON, &storage); err != nil {
+		t.Fatalf("invalid storage json: %v", err)
+	}
+	if len(storage.Slots) != 2 {
+		t.Fatalf("unexpected storage slot count: %d", len(storage.Slots))
+	}
+	if storage.Slots[0].Name != "total" || storage.Slots[0].Type != "u256" {
+		t.Fatalf("unexpected first storage slot: %+v", storage.Slots[0])
+	}
+	wantSlotHash := keccak256Hex([]byte("tol.slot.Demo.total"))
+	if storage.Slots[0].CanonicalHash != wantSlotHash {
+		t.Fatalf("unexpected slot hash: got=%s want=%s", storage.Slots[0].CanonicalHash, wantSlotHash)
+	}
+}
+
+func TestCompileTOLToTOCDeterministic(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public {
+    return;
+  }
+}
+`)
+	a, err := CompileTOLToTOC(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error (first): %v", err)
+	}
+	b, err := CompileTOLToTOC(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error (second): %v", err)
+	}
+	if !bytes.Equal(a, b) {
+		t.Fatalf("expected deterministic toc bytes")
+	}
+}
+
+func TestEncodeTOCRejectsInvalidHash(t *testing.T) {
+	_, err := EncodeTOC(&TOCArtifact{
+		Version:      TOCFormatVersion,
+		Compiler:     "tolang/" + PackageVersion,
+		ContractName: "Demo",
+		Bytecode:     []byte{1, 2, 3},
+		SourceHash:   "0x1234",
+		BytecodeHash: keccak256Hex([]byte{1, 2, 3}),
+	})
+	if err == nil {
+		t.Fatalf("expected invalid hash error")
+	}
+}
