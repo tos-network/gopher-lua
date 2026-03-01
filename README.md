@@ -131,20 +131,20 @@ The test suite is stored in `./_lua54-subset-test` and controlled by
 Compile source to bytecode:
 
 ```bash
-tolang -c contract.glbc contract.lua
+./tol -c contract.glbc contract.lua
 ```
 
 Execute bytecode:
 
 ```bash
-tolang -bc contract.glbc
+./tol -bc contract.glbc
 ```
 
 Dump IR from source or bytecode:
 
 ```bash
-tolang -di contract.lua
-tolang -di -bc contract.glbc
+./tol -di contract.lua
+./tol -di -bc contract.glbc
 ```
 
 Programmatic APIs:
@@ -173,7 +173,7 @@ go build -o tol ./cmd/tolang
 ```
 
 Legacy Lua/VM flat-flag modes are still available for compatibility, e.g.
-`./tol -e "x=1"`, `./tol -di script.lua`, `./tolang -ctoc out.toc input.tol`.
+`./tol -e "x=1"`, `./tol -di script.lua`, `./tol -ctoc out.toc input.tol`.
 
 ## Module
 

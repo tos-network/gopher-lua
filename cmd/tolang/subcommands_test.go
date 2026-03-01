@@ -22,6 +22,21 @@ func TestDefaultArtifactPath(t *testing.T) {
 	}
 }
 
+func TestDispatchSubcommandRouting(t *testing.T) {
+	if handled, _ := dispatchSubcommand(nil); handled {
+		t.Fatalf("empty args should not be handled by subcommand dispatcher")
+	}
+	if handled, _ := dispatchSubcommand([]string{"unknown"}); handled {
+		t.Fatalf("unknown subcommand should fall back to legacy handler")
+	}
+	if handled, code := dispatchSubcommand([]string{"--help"}); !handled || code != 0 {
+		t.Fatalf("--help should be handled with code 0, got handled=%v code=%d", handled, code)
+	}
+	if handled, code := dispatchSubcommand([]string{"--version"}); !handled || code != 0 {
+		t.Fatalf("--version should be handled with code 0, got handled=%v code=%d", handled, code)
+	}
+}
+
 func TestDetectArtifactKindMagicFallback(t *testing.T) {
 	src := []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n")
 	toc, err := lua.CompileTOLToTOC(src, "sample.tol")
@@ -270,5 +285,23 @@ func TestCmdVerifySourceFlagRejectedForNonTOC(t *testing.T) {
 	}
 	if code := cmdVerify([]string{"--source", srcPath, torPath}); code != 1 {
 		t.Fatalf("verify tor with --source: got=%d want=1", code)
+	}
+}
+
+func TestCmdCompileRejectsInvalidFlagCombinations(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "sample.tol")
+	if err := os.WriteFile(input, []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	if code := cmdCompile([]string{"--emit", "toi", "--abi", input}); code != 1 {
+		t.Fatalf("--abi with emit=toi: got=%d want=1", code)
+	}
+	if code := cmdCompile([]string{"--emit", "toc", "--package-name", "x", input}); code != 1 {
+		t.Fatalf("--package-name with emit=toc: got=%d want=1", code)
+	}
+	if code := cmdCompile([]string{"--emit", "toc", "--include-source", input}); code != 1 {
+		t.Fatalf("--include-source with emit=toc: got=%d want=1", code)
 	}
 }
