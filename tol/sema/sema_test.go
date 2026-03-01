@@ -2150,6 +2150,37 @@ func TestCheckRejectsAssertNonLiteralMessage(t *testing.T) {
 	}
 }
 
+func TestCheckAcceptsRequireAssertLiteralMessage(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "require",
+							Expr: &ast.Expr{Kind: "ident", Value: "ok"},
+							Text: "\"BAD\"",
+						},
+						{
+							Kind: "assert",
+							Expr: &ast.Expr{Kind: "ident", Value: "ok"},
+							Text: "\"BAD\"",
+						},
+						{Kind: "return"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsEmitNonCallExpr(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

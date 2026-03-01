@@ -565,6 +565,23 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLAcceptsRequireAssertLiteralMessages(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run(ok: bool) public {
+    require(ok, "BAD");
+    assert(ok, "BAD");
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected build error: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsRevertNonStringPayload(t *testing.T) {
 	src := []byte(`
 tol 0.2
