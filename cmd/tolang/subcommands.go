@@ -39,7 +39,7 @@ func dispatchSubcommand(args []string) (bool, int) {
 func printRootSubcommandUsage() {
 	fmt.Print(`Usage:
   tol <subcommand> [flags] <inputs...>
-  tol [legacy-lua-options] [script [args]]
+  tol [lua-options] [script [args]]
 
 Subcommands:
   compile   compile .tol source to .toc/.toi/.tor

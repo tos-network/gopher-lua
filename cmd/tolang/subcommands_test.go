@@ -27,7 +27,7 @@ func TestDispatchSubcommandRouting(t *testing.T) {
 		t.Fatalf("empty args should not be handled by subcommand dispatcher")
 	}
 	if handled, _ := dispatchSubcommand([]string{"unknown"}); handled {
-		t.Fatalf("unknown subcommand should fall back to legacy handler")
+		t.Fatalf("unknown subcommand should fall back to lua script/flag handler")
 	}
 	if handled, code := dispatchSubcommand([]string{"--help"}); !handled || code != 0 {
 		t.Fatalf("--help should be handled with code 0, got handled=%v code=%d", handled, code)

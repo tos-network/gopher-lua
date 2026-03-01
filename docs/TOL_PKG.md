@@ -21,7 +21,7 @@ Scope: File formats, package layout, standard library, and on-chain registry
   contract names must be unique;
   `DecodeTOR` validates embedded `.toc`/`.toi` entries)
 
-### CLI (landed subcommands; legacy flags still supported)
+### CLI (landed subcommands)
 
 The `tol` CLI now supports subcommands in the style specified in §7:
 
@@ -35,8 +35,6 @@ tol inspect --json trc20-base-1.0.0.tor
 tol verify trc20.toc
 tol verify --source trc20.tol trc20.toc
 ```
-
-Legacy flat flags (`tolang -ctoc/-dtocj/-vtor/...`) are kept for compatibility.
 
 ### Not landed yet
 
@@ -627,25 +625,10 @@ tol test --fuzz fuzz_transfer --fuzz-time 30s
 | Uniform `--json` for machine output | `tol inspect --json` | consistent across subcommands |
 | Subcommand help | `tol compile --help` | go, cargo |
 
-### 7.9 Migration from legacy flat-flag style
+### 7.9 Legacy Flat Flags
 
-| Legacy (current) | New subcommand style |
-|-----------------|----------------------|
-| `tolang -ctoc out.toc input.tol` | `tol compile -o out.toc input.tol` |
-| `tolang -ctoi out.toi input.tol` | `tol compile --emit toi -o out.toi input.tol` |
-| `tolang -ctoi out.toi -ctoiname X input.tol` | `tol compile --emit toi --name X -o out.toi input.tol` |
-| `tolang -dtoi interface.toi` | `tol inspect interface.toi` |
-| `tolang -ctor out.tor input.tol` | `tol compile --emit tor -o out.tor input.tol` |
-| `tolang -ctorpkg n -ctorver v -ctorifacename X -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --name X --include-source -o out.tor in.tol` |
-| `tolang -ctor out.tor ./dir/` | `tol pack -o out.tor ./dir/` |
-| `tolang -dtoc artifact.toc` | `tol inspect artifact.toc` |
-| `tolang -dtocj artifact.toc` | `tol inspect --json artifact.toc` |
-| `tolang -vtoc artifact.toc` | `tol verify artifact.toc` |
-| `tolang -vtoc -vtocsrc src.tol artifact.toc` | `tol verify --source src.tol artifact.toc` |
-| `tolang -vtoi interface.toi` | `tol verify interface.toi` |
-| `tolang -dtor artifact.tor` | `tol inspect artifact.tor` |
-| `tolang -dtorj artifact.tor` | `tol inspect --json artifact.tor` |
-| `tolang -vtor artifact.tor` | `tol verify artifact.tor` |
+Legacy TOL flat flags are removed. Use `tol compile`, `tol pack`, `tol inspect`,
+and `tol verify`.
 
 ---
 

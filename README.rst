@@ -655,7 +655,7 @@ Lua has an interpreter called ``lua`` . This fork ships an interpreter called ``
    ./tol inspect contract.toc
    ./tol verify contract.toc
 
-Legacy Lua-mode flags remain available for compatibility.
+Lua-mode flags remain available for scripting/debugging.
 
 ----------------------------------------------------------------
 How to Contribute

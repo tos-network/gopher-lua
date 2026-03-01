@@ -2,12 +2,10 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -27,37 +25,18 @@ func mainAux() int {
 		return status
 	}
 
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver, opt_ctorifacename string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoi, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_vtoi, opt_ctorsrc bool
+	var opt_e, opt_l, opt_p, opt_c string
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
 	flag.StringVar(&opt_c, "c", "", "")
-	flag.StringVar(&opt_ctol, "ctol", "", "")
-	flag.StringVar(&opt_ctoi, "ctoi", "", "")
-	flag.StringVar(&opt_ctoiname, "ctoiname", "", "")
-	flag.StringVar(&opt_ctoc, "ctoc", "", "")
-	flag.StringVar(&opt_ctor, "ctor", "", "")
-	flag.StringVar(&opt_ctorpkg, "ctorpkg", "", "")
-	flag.StringVar(&opt_ctorver, "ctorver", "", "")
-	flag.StringVar(&opt_ctorifacename, "ctorifacename", "", "")
-	flag.StringVar(&opt_vtocsrc, "vtocsrc", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
 	flag.BoolVar(&opt_dt, "dt", false, "")
 	flag.BoolVar(&opt_dc, "dc", false, "")
 	flag.BoolVar(&opt_di, "di", false, "")
 	flag.BoolVar(&opt_bc, "bc", false, "")
-	flag.BoolVar(&opt_dtol, "dtol", false, "")
-	flag.BoolVar(&opt_dtoi, "dtoi", false, "")
-	flag.BoolVar(&opt_dtoc, "dtoc", false, "")
-	flag.BoolVar(&opt_dtocj, "dtocj", false, "")
-	flag.BoolVar(&opt_vtoc, "vtoc", false, "")
-	flag.BoolVar(&opt_dtor, "dtor", false, "")
-	flag.BoolVar(&opt_dtorj, "dtorj", false, "")
-	flag.BoolVar(&opt_vtor, "vtor", false, "")
-	flag.BoolVar(&opt_vtoi, "vtoi", false, "")
-	flag.BoolVar(&opt_ctorsrc, "ctorsrc", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage:
   tol <subcommand> [flags] <inputs...>
@@ -69,34 +48,15 @@ Subcommands:
   inspect   inspect .toc/.toi/.tor metadata
   verify    verify .toc/.toi/.tor integrity
 
-Legacy Lua/VM options are preserved:
+Lua/VM options:
 	Available options are:
 	  -e stat  execute string 'stat'
 	  -l name  require library 'name'
 	  -c file  compile source script to bytecode file
-	  -ctol file  compile TOL source script to bytecode file (skeleton path)
-	  -ctoi file  compile TOL source script to .toi interface file
-	  -ctoiname name  interface name override for -ctoi
-	  -ctoc file  compile TOL source script to .toc artifact file
-	  -ctor file  package a directory into .tor archive file
-	  -ctorpkg name  package name override for one-shot -ctor <file.tol>
-	  -ctorver ver  package version override for one-shot -ctor <file.tol>
-	  -ctorifacename name  .toi interface name override for one-shot -ctor <file.tol>
-	  -ctorsrc   include source file in one-shot -ctor <file.tol>
 	  -bc      treat input script as bytecode
 	  -dt      dump AST trees
 	  -dc      dump VM codes
 	  -di      dump IR
-	  -dtol    dump parsed TOL module
-	  -dtoi    dump parsed TOI metadata
-	  -dtoc    dump parsed TOC artifact metadata
-	  -dtocj   dump parsed TOC artifact metadata as JSON
-	  -dtor    dump parsed TOR archive metadata
-	  -dtorj   dump parsed TOR archive metadata as JSON
-	  -vtoc    validate TOC artifact and return status
-	  -vtocsrc file  optional source file to verify TOC source_hash (use with -vtoc)
-	  -vtor    validate TOR artifact and return status
-	  -vtoi    validate TOI text and return status
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -113,58 +73,6 @@ Legacy Lua/VM options are preserved:
 	}
 	if len(opt_e) == 0 && !opt_i && !opt_v && flag.NArg() == 0 {
 		opt_i = true
-	}
-	if len(opt_c) > 0 && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0) {
-		fmt.Println("cannot use -c with -ctol/-ctoi/-ctoc/-ctor together")
-		return 1
-	}
-	if len(opt_ctol) > 0 && (len(opt_ctoi) > 0 || len(opt_ctoc) > 0) {
-		fmt.Println("cannot use -ctol with -ctoi/-ctoc together")
-		return 1
-	}
-	if len(opt_ctoi) > 0 && len(opt_ctoc) > 0 {
-		fmt.Println("cannot use -ctoi and -ctoc together")
-		return 1
-	}
-	if len(opt_ctor) > 0 && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0) {
-		fmt.Println("cannot use -ctor with -ctol/-ctoi/-ctoc together")
-		return 1
-	}
-	if len(opt_vtocsrc) > 0 && !opt_vtoc {
-		fmt.Println("-vtocsrc requires -vtoc")
-		return 1
-	}
-	if len(opt_ctoiname) > 0 && len(opt_ctoi) == 0 {
-		fmt.Println("-ctoiname requires -ctoi")
-		return 1
-	}
-	if (len(opt_ctorpkg) > 0 || len(opt_ctorver) > 0 || len(opt_ctorifacename) > 0 || opt_ctorsrc) && len(opt_ctor) == 0 {
-		fmt.Println("-ctorpkg/-ctorver/-ctorifacename/-ctorsrc require -ctor")
-		return 1
-	}
-	if opt_dtoc && opt_vtoc {
-		fmt.Println("cannot use -dtoc and -vtoc together")
-		return 1
-	}
-	if opt_dtocj && opt_vtoc {
-		fmt.Println("cannot use -dtocj and -vtoc together")
-		return 1
-	}
-	if opt_dtoc && opt_dtocj {
-		fmt.Println("cannot use -dtoc and -dtocj together")
-		return 1
-	}
-	if opt_dtor && opt_dtorj {
-		fmt.Println("cannot use -dtor and -dtorj together")
-		return 1
-	}
-	if opt_vtor && (opt_dtor || opt_dtorj) {
-		fmt.Println("cannot use -vtor with -dtor/-dtorj together")
-		return 1
-	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoi || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor || opt_vtoi) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoi, -ctoc, -ctor, -dtol, -dtoi, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, -vtor, or -vtoi")
-		return 1
 	}
 
 	status := 0
@@ -207,123 +115,6 @@ Legacy Lua/VM options are preserved:
 		}
 		return 0
 	}
-	if len(opt_ctol) > 0 {
-		if flag.NArg() == 0 {
-			fmt.Println("TOL compile mode requires an input source script")
-			return 1
-		}
-		input := flag.Arg(0)
-		src, err := os.ReadFile(input)
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		bc, err := lua.CompileTOLToBytecode(src, input)
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		if err := os.WriteFile(opt_ctol, bc, 0o644); err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		return 0
-	}
-	if len(opt_ctoi) > 0 {
-		if flag.NArg() == 0 {
-			fmt.Println("TOL .toi compile mode requires an input source script")
-			return 1
-		}
-		input := flag.Arg(0)
-		src, err := os.ReadFile(input)
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		toi, err := lua.CompileTOLToTOIWithOptions(src, input, &lua.TOICompileOptions{
-			InterfaceName: opt_ctoiname,
-		})
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		if err := os.WriteFile(opt_ctoi, toi, 0o644); err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		return 0
-	}
-	if len(opt_ctoc) > 0 {
-		if flag.NArg() == 0 {
-			fmt.Println("TOL .toc compile mode requires an input source script")
-			return 1
-		}
-		input := flag.Arg(0)
-		src, err := os.ReadFile(input)
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		toc, err := lua.CompileTOLToTOC(src, input)
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		if err := os.WriteFile(opt_ctoc, toc, 0o644); err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		return 0
-	}
-	if len(opt_ctor) > 0 {
-		if flag.NArg() == 0 {
-			fmt.Println("TOR package mode requires an input directory or .tol source file")
-			return 1
-		}
-		input := flag.Arg(0)
-		info, err := os.Stat(input)
-		if err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		var tor []byte
-		if info.IsDir() {
-			manifest, files, err := collectTORPackageInputs(input)
-			if err != nil {
-				fmt.Println(err.Error())
-				return 1
-			}
-			tor, err = lua.EncodeTOR(manifest, files)
-			if err != nil {
-				fmt.Println(err.Error())
-				return 1
-			}
-		} else if strings.HasSuffix(strings.ToLower(input), ".tol") {
-			src, err := os.ReadFile(input)
-			if err != nil {
-				fmt.Println(err.Error())
-				return 1
-			}
-			tor, err = lua.CompileTOLToTOR(src, input, &lua.TORCompileOptions{
-				PackageName:      opt_ctorpkg,
-				PackageVersion:   opt_ctorver,
-				TOIInterfaceName: opt_ctorifacename,
-				IncludeSource:    opt_ctorsrc,
-			})
-			if err != nil {
-				fmt.Println(err.Error())
-				return 1
-			}
-		} else {
-			fmt.Println("-ctor input must be a package directory or .tol source file")
-			return 1
-		}
-		if err := os.WriteFile(opt_ctor, tor, 0o644); err != nil {
-			fmt.Println(err.Error())
-			return 1
-		}
-		return 0
-	}
 	if nargs := flag.NArg(); nargs > 0 {
 		script := flag.Arg(0)
 		argtb := L.NewTable()
@@ -336,185 +127,6 @@ Legacy Lua/VM options are preserved:
 			fmt.Println(err.Error())
 			status = 1
 		} else {
-			if opt_dtol {
-				mod, err := lua.ParseTOLModule(src, script)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Println(mod.String())
-				return 0
-			}
-			if opt_dtoi {
-				info, err := lua.InspectTOIText(src)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Printf("TOI version: %s\n", info.Version)
-				fmt.Printf("Interface: %s\n", info.InterfaceName)
-				fmt.Printf("Functions: %d\n", info.FunctionCount)
-				fmt.Printf("Events: %d\n", info.EventCount)
-				return 0
-			}
-			if opt_dtoc {
-				toc, err := lua.DecodeTOC(src)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				if _, err := lua.DecodeFunctionProto(toc.Bytecode); err != nil {
-					fmt.Printf("invalid embedded bytecode: %v\n", err)
-					return 1
-				}
-				fmt.Printf("TOC version: %d\n", toc.Version)
-				fmt.Printf("Compiler: %s\n", toc.Compiler)
-				fmt.Printf("Contract: %s\n", toc.ContractName)
-				fmt.Printf("Bytecode bytes: %d\n", len(toc.Bytecode))
-				fmt.Printf("Bytecode decode: ok\n")
-				fmt.Printf("Source hash: %s\n", toc.SourceHash)
-				fmt.Printf("Bytecode hash: %s\n", toc.BytecodeHash)
-				if len(toc.ABIJSON) > 0 {
-					fmt.Printf("ABI JSON: %s\n", string(toc.ABIJSON))
-				}
-				if len(toc.StorageLayoutJSON) > 0 {
-					fmt.Printf("Storage JSON: %s\n", string(toc.StorageLayoutJSON))
-				}
-				return 0
-			}
-			if opt_dtocj {
-				toc, err := lua.DecodeTOC(src)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				out := struct {
-					Version       uint16          `json:"version"`
-					Compiler      string          `json:"compiler"`
-					ContractName  string          `json:"contract_name"`
-					BytecodeBytes int             `json:"bytecode_bytes"`
-					SourceHash    string          `json:"source_hash"`
-					BytecodeHash  string          `json:"bytecode_hash"`
-					ABIJSON       json.RawMessage `json:"abi_json,omitempty"`
-					StorageJSON   json.RawMessage `json:"storage_json,omitempty"`
-				}{
-					Version:       toc.Version,
-					Compiler:      toc.Compiler,
-					ContractName:  toc.ContractName,
-					BytecodeBytes: len(toc.Bytecode),
-					SourceHash:    toc.SourceHash,
-					BytecodeHash:  toc.BytecodeHash,
-				}
-				if len(toc.ABIJSON) > 0 {
-					out.ABIJSON = json.RawMessage(toc.ABIJSON)
-				}
-				if len(toc.StorageLayoutJSON) > 0 {
-					out.StorageJSON = json.RawMessage(toc.StorageLayoutJSON)
-				}
-				b, err := json.MarshalIndent(out, "", "  ")
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Println(string(b))
-				return 0
-			}
-			if opt_vtoc {
-				toc, err := lua.DecodeTOC(src)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				if len(opt_vtocsrc) > 0 {
-					source, err := os.ReadFile(opt_vtocsrc)
-					if err != nil {
-						fmt.Println(err.Error())
-						return 1
-					}
-					if err := lua.VerifyTOCSourceHash(toc, source); err != nil {
-						fmt.Println(err.Error())
-						return 1
-					}
-				}
-				fmt.Println("TOC: ok")
-				return 0
-			}
-			if opt_dtor {
-				tor, err := lua.DecodeTOR(src)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Printf("Manifest JSON: %s\n", string(tor.ManifestJSON))
-				fmt.Printf("Files: %d\n", len(tor.Files))
-				names := make([]string, 0, len(tor.Files))
-				for name := range tor.Files {
-					names = append(names, name)
-				}
-				sort.Strings(names)
-				for _, name := range names {
-					fmt.Printf(" - %s (%d bytes)\n", name, len(tor.Files[name]))
-				}
-				fmt.Printf("Package hash: %s\n", lua.TORPackageHash(src))
-				return 0
-			}
-			if opt_dtorj {
-				tor, err := lua.DecodeTOR(src)
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				type torFileInfo struct {
-					Path  string `json:"path"`
-					Bytes int    `json:"bytes"`
-				}
-				names := make([]string, 0, len(tor.Files))
-				for name := range tor.Files {
-					names = append(names, name)
-				}
-				sort.Strings(names)
-				infos := make([]torFileInfo, 0, len(names))
-				for _, name := range names {
-					infos = append(infos, torFileInfo{
-						Path:  name,
-						Bytes: len(tor.Files[name]),
-					})
-				}
-				out := struct {
-					ManifestJSON json.RawMessage `json:"manifest_json"`
-					FileCount    int             `json:"file_count"`
-					Files        []torFileInfo   `json:"files"`
-					PackageHash  string          `json:"package_hash"`
-				}{
-					ManifestJSON: json.RawMessage(tor.ManifestJSON),
-					FileCount:    len(tor.Files),
-					Files:        infos,
-					PackageHash:  lua.TORPackageHash(src),
-				}
-				b, err := json.MarshalIndent(out, "", "  ")
-				if err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Println(string(b))
-				return 0
-			}
-			if opt_vtor {
-				if _, err := lua.DecodeTOR(src); err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Println("TOR: ok")
-				return 0
-			}
-			if opt_vtoi {
-				if err := lua.ValidateTOIText(src); err != nil {
-					fmt.Println(err.Error())
-					return 1
-				}
-				fmt.Println("TOI: ok")
-				return 0
-			}
 			if opt_dt || opt_dc || opt_di {
 				if opt_bc {
 					if opt_dt {

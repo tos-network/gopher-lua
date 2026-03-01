@@ -172,8 +172,8 @@ go build -o tol ./cmd/tolang
 ./tol pack -o out.tor ./contracts/
 ```
 
-Legacy Lua/VM flat-flag modes are still available for compatibility, e.g.
-`./tol -e "x=1"`, `./tol -di script.lua`, `./tol -ctoc out.toc input.tol`.
+Lua/VM flags are available for scripting and VM debugging, e.g.
+`./tol -e "x=1"`, `./tol -di script.lua`, `./tol -bc contract.glbc`.
 
 ## Module
 
