@@ -929,12 +929,49 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLAcceptsNonVoidInfiniteWhileGuaranteedReturn(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn f() -> (out: u256) public {
+    while true {
+      return 1;
+    }
+  }
+}
+`)
+	if _, err := BuildIRFromTOL(src, "<tol>"); err != nil {
+		t.Fatalf("expected success, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsUnreachableStmtAfterReturn(t *testing.T) {
 	src := []byte(`
 tol 0.2
 contract Demo {
   fn run() public {
     return;
+    let x: u256 = 1;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unreachable statement error")
+	}
+	if !strings.Contains(err.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsUnreachableAfterTerminatingInfiniteWhile(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    while true {
+      return;
+    }
     let x: u256 = 1;
   }
 }

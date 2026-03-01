@@ -775,9 +775,23 @@ func guaranteesValueReturnOrRevertStmt(s ast.Statement) bool {
 			return false
 		}
 		return guaranteesValueReturnOrRevert(s.Then) && guaranteesValueReturnOrRevert(s.Else)
+	case "while", "for":
+		if !loopConditionAlwaysTrue(s) {
+			return false
+		}
+		return blockGuaranteesValueReturnOrRevert(s.Body)
 	default:
 		return false
 	}
+}
+
+func blockGuaranteesValueReturnOrRevert(stmts []ast.Statement) bool {
+	for _, s := range stmts {
+		if guaranteesValueReturnOrRevertStmt(s) {
+			return true
+		}
+	}
+	return false
 }
 
 func checkUnreachableStatements(filename string, stmts []ast.Statement, loopDepth int, diags *diag.Diagnostics) {
@@ -813,6 +827,11 @@ func guaranteesTerminationStmt(s ast.Statement, loopDepth int) bool {
 		return true
 	case "break", "continue":
 		return loopDepth > 0
+	case "while", "for":
+		if !loopConditionAlwaysTrue(s) {
+			return false
+		}
+		return blockGuaranteesHardTermination(s.Body, loopDepth+1)
 	case "if":
 		if len(s.Then) == 0 || len(s.Else) == 0 {
 			return false
@@ -830,6 +849,53 @@ func blockGuaranteesTermination(stmts []ast.Statement, loopDepth int) bool {
 		}
 	}
 	return false
+}
+
+func blockGuaranteesHardTermination(stmts []ast.Statement, loopDepth int) bool {
+	for _, s := range stmts {
+		if guaranteesHardTerminationStmt(s, loopDepth) {
+			return true
+		}
+	}
+	return false
+}
+
+func guaranteesHardTerminationStmt(s ast.Statement, loopDepth int) bool {
+	switch s.Kind {
+	case "return", "revert":
+		return true
+	case "if":
+		if len(s.Then) == 0 || len(s.Else) == 0 {
+			return false
+		}
+		return blockGuaranteesHardTermination(s.Then, loopDepth) && blockGuaranteesHardTermination(s.Else, loopDepth)
+	case "while", "for":
+		if !loopConditionAlwaysTrue(s) {
+			return false
+		}
+		return blockGuaranteesHardTermination(s.Body, loopDepth+1)
+	default:
+		return false
+	}
+}
+
+func loopConditionAlwaysTrue(s ast.Statement) bool {
+	switch s.Kind {
+	case "while":
+		return isLiteralTrueIdentExpr(s.Cond)
+	case "for":
+		if s.Cond == nil {
+			return true
+		}
+		return isLiteralTrueIdentExpr(s.Cond)
+	default:
+		return false
+	}
+}
+
+func isLiteralTrueIdentExpr(e *ast.Expr) bool {
+	root := stripParens(e)
+	return root != nil && root.Kind == "ident" && strings.TrimSpace(root.Value) == "true"
 }
 
 type localScope struct {

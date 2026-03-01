@@ -1564,6 +1564,65 @@ func TestCheckAcceptsNonVoidFunctionAllPathsReturnOrRevert(t *testing.T) {
 	}
 }
 
+func TestCheckAcceptsNonVoidFunctionInfiniteWhileWithGuaranteedReturn(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Returns: []ast.FieldDecl{
+						{Name: "out", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "while",
+							Cond: &ast.Expr{Kind: "ident", Value: "true"},
+							Body: []ast.Statement{
+								{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestCheckAcceptsNonVoidFunctionInfiniteForWithGuaranteedRevert(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Returns: []ast.FieldDecl{
+						{Name: "out", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "for",
+							Body: []ast.Statement{
+								{Kind: "revert", Expr: &ast.Expr{Kind: "string", Value: "\"X\""}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsUnreachableStmtAfterReturn(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -1603,6 +1662,37 @@ func TestCheckRejectsUnreachableStmtAfterTerminatingIf(t *testing.T) {
 							Cond: &ast.Expr{Kind: "ident", Value: "flag"},
 							Then: []ast.Statement{{Kind: "return"}},
 							Else: []ast.Statement{{Kind: "revert", Expr: &ast.Expr{Kind: "string", Value: "\"X\""}}},
+						},
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsUnreachableStmtAfterTerminatingInfiniteWhile(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind: "while",
+							Cond: &ast.Expr{Kind: "ident", Value: "true"},
+							Body: []ast.Statement{
+								{Kind: "return"},
+							},
 						},
 						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
 					},

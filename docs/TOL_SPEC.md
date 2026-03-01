@@ -796,7 +796,11 @@ Implemented:
     including `require/assert` expressions, `revert` payloads,
     and `emit` payload arguments.
 17. Non-void functions require all current-stage structured control paths to
-    terminate with value-return or `revert` (loops are still conservatively treated).
+    terminate with value-return or `revert`.
+    Current loop handling supports a deterministic subset:
+    literal-infinite loops (`while true`, `for` with omitted condition, or `for true`)
+    are treated as terminating only when the loop body itself guarantees
+    value-return or `revert`; other loop forms remain conservative.
 18. Statement-shape checks enforce current subset contracts:
     `require/assert` must carry condition expression plus string-literal message;
     `emit` must carry identifier-call payload.
@@ -855,7 +859,9 @@ Partially implemented:
    full spec-level canonical slot hashing/addressing and host-persistent storage
    builtins are not wired yet.
 5. `continue` semantics are lowered via deterministic labels/goto in loops,
-   but still need deeper verifier checks for corner-case control flow.
+   and verifier loop-termination analysis now supports literal-infinite loops
+   with guaranteed `return`/`revert` in the loop body.
+   Deeper corner-case control-flow analysis is still pending.
 6. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
    signed arithmetic/cast verifier semantics are not yet complete.
 7. `selector("sig")` currently requires a string literal in signature form
