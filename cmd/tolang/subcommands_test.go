@@ -185,3 +185,90 @@ func TestCmdCompileTORDefaultsAndNameOverride(t *testing.T) {
 		t.Fatalf("tor toi name override: got=%q want=%q", info.InterfaceName, "ISampleZ")
 	}
 }
+
+func TestCmdInspectAndVerifyWithoutExtension(t *testing.T) {
+	dir := t.TempDir()
+	srcPath := filepath.Join(dir, "sample.tol")
+	src := []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n")
+	if err := os.WriteFile(srcPath, src, 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	toc, err := lua.CompileTOLToTOC(src, srcPath)
+	if err != nil {
+		t.Fatalf("compile toc: %v", err)
+	}
+	toi, err := lua.CompileTOLToTOI(src, srcPath)
+	if err != nil {
+		t.Fatalf("compile toi: %v", err)
+	}
+	tor, err := lua.CompileTOLToTOR(src, srcPath, &lua.TORCompileOptions{})
+	if err != nil {
+		t.Fatalf("compile tor: %v", err)
+	}
+
+	tocPath := filepath.Join(dir, "toc.bin")
+	toiPath := filepath.Join(dir, "toi.bin")
+	torPath := filepath.Join(dir, "tor.bin")
+	if err := os.WriteFile(tocPath, toc, 0o644); err != nil {
+		t.Fatalf("write toc: %v", err)
+	}
+	if err := os.WriteFile(toiPath, toi, 0o644); err != nil {
+		t.Fatalf("write toi: %v", err)
+	}
+	if err := os.WriteFile(torPath, tor, 0o644); err != nil {
+		t.Fatalf("write tor: %v", err)
+	}
+
+	if code := cmdInspect([]string{tocPath}); code != 0 {
+		t.Fatalf("inspect toc without extension: got=%d want=0", code)
+	}
+	if code := cmdInspect([]string{toiPath}); code != 0 {
+		t.Fatalf("inspect toi without extension: got=%d want=0", code)
+	}
+	if code := cmdInspect([]string{torPath}); code != 0 {
+		t.Fatalf("inspect tor without extension: got=%d want=0", code)
+	}
+	if code := cmdVerify([]string{tocPath}); code != 0 {
+		t.Fatalf("verify toc without extension: got=%d want=0", code)
+	}
+	if code := cmdVerify([]string{toiPath}); code != 0 {
+		t.Fatalf("verify toi without extension: got=%d want=0", code)
+	}
+	if code := cmdVerify([]string{torPath}); code != 0 {
+		t.Fatalf("verify tor without extension: got=%d want=0", code)
+	}
+}
+
+func TestCmdVerifySourceFlagRejectedForNonTOC(t *testing.T) {
+	dir := t.TempDir()
+	src := []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n")
+	srcPath := filepath.Join(dir, "sample.tol")
+	if err := os.WriteFile(srcPath, src, 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	toi, err := lua.CompileTOLToTOI(src, srcPath)
+	if err != nil {
+		t.Fatalf("compile toi: %v", err)
+	}
+	toiPath := filepath.Join(dir, "sample.toi")
+	if err := os.WriteFile(toiPath, toi, 0o644); err != nil {
+		t.Fatalf("write toi: %v", err)
+	}
+	if code := cmdVerify([]string{"--source", srcPath, toiPath}); code != 1 {
+		t.Fatalf("verify toi with --source: got=%d want=1", code)
+	}
+
+	tor, err := lua.CompileTOLToTOR(src, srcPath, &lua.TORCompileOptions{})
+	if err != nil {
+		t.Fatalf("compile tor: %v", err)
+	}
+	torPath := filepath.Join(dir, "sample.tor")
+	if err := os.WriteFile(torPath, tor, 0o644); err != nil {
+		t.Fatalf("write tor: %v", err)
+	}
+	if code := cmdVerify([]string{"--source", srcPath, torPath}); code != 1 {
+		t.Fatalf("verify tor with --source: got=%d want=1", code)
+	}
+}
