@@ -301,6 +301,12 @@ contract Demo {
 	}
 }
 
+func TestVerifyTOCSourceHashRejectsNilArtifact(t *testing.T) {
+	if err := VerifyTOCSourceHash(nil, []byte("x")); err == nil {
+		t.Fatalf("expected nil artifact error")
+	}
+}
+
 func TestDecodeTOCRejectsInvalidABIJSON(t *testing.T) {
 	src := []byte(`
 tol 0.2
