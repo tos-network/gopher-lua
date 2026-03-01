@@ -1,6 +1,6 @@
 # TOL Built-in Testing Framework
 
-Status: Design Draft v0.1 (2026-03-01)
+Status: Design Draft v0.2 (2026-03-01)
 Owner: GTOS/Tolang engineering
 Scope: Language-level test syntax, runner semantics, and coverage model for TOL contracts
 
@@ -9,21 +9,22 @@ Scope: Language-level test syntax, runner semantics, and coverage model for TOL 
 ## 1. Motivation
 
 Go and Rust ship testing as a first-class language feature (`_test.go`, `#[test]`).
-Java's commercial success owes much to mature test tooling (JUnit, JTest, JCoverage).
-TOL adopts the same philosophy: testing must be a language-level primitive, not an
-afterthought bolted on via external frameworks.
+Java's commercial success owes much to mature test tooling (JUnit, JTest/Parasoft,
+JaCoCo/JCoverage). TOL adopts the same philosophy: testing must be a language-level
+primitive, not an afterthought bolted on via external frameworks.
 
 Smart-contract testing has requirements beyond ordinary unit testing:
 
 1. **Deployment state** — a contract must be instantiated (constructor) before calls.
 2. **Call context** — each invocation carries `msg.sender`, `msg.value`, `block.*`.
-3. **Revert assertions** — a test must be able to assert that a call fails with a
-   specific message, and that state is unchanged after the revert.
+3. **Revert assertions** — a test must assert that a call fails with a specific message,
+   and that storage is unchanged after the revert.
 4. **Event assertions** — contracts communicate side-effects via events; tests must
    verify that the right events were emitted with the right arguments.
 5. **Storage isolation** — each test runs against a fresh contract instance; state
    does not bleed between tests.
-6. **Coverage** — the runner reports which functions and storage paths were exercised.
+6. **Coverage** — the runner reports which functions, branches, and storage paths
+   were exercised.
 
 ---
 
@@ -37,9 +38,8 @@ trc20_test.tol     ← test file (excluded from deployment artifact)
 ```
 
 The compiler and runner treat `*_test.tol` files identically to how Go treats
-`*_test.go`: they are compiled only when the test runner is invoked
-(`tol test ./...`), and they may import and instantiate contracts from sibling `.tol`
-files.
+`*_test.go`: compiled only when the test runner is invoked (`tol test ./...`),
+and may import and instantiate contracts from sibling `.tol` files.
 
 ---
 
@@ -57,10 +57,21 @@ test TRC20Test {
   let bob:     address = 0x000000000000000000000000000000000000000000000000000000000000b0b0;
   let charlie: address = 0x000000000000000000000000000000000000000000000000000000000000c4a0;
 
+  -- setup_suite() runs once before all tests in this block (JUnit @BeforeClass equivalent)
+  setup_suite -> (registry: Registry) {
+    deploy Registry() -> registry;
+  }
+
   -- setup() runs before each test function with a fresh contract instance
   setup -> (token: TRC20) {
     deploy TRC20(owner: alice, supply: 1000u256) -> token;
   }
+
+  -- teardown() runs after each test (pass or fail)
+  teardown (token: TRC20) { }
+
+  -- teardown_suite() runs once after all tests (JUnit @AfterClass equivalent)
+  teardown_suite (registry: Registry) { }
 
   fn test_constructor_sets_supply(token: TRC20) {
     assert_eq token.totalSupply(), 1000u256;
@@ -71,12 +82,22 @@ test TRC20Test {
     assert_eq token.balanceOf(bob),   0u256;
   }
 
+  #[skip]
+  fn test_wip_feature(token: TRC20) {
+    -- known failing, excluded from run without being deleted
+  }
+
+  #[tag("slow")]
+  fn test_many_transfers(token: TRC20) {
+    -- tagged; run with: tol test -tag slow
+  }
+
   fn test_transfer_moves_balance(token: TRC20) {
     with msg.sender = alice {
       token.transfer(bob, 300u256);
     }
-    assert_eq token.balanceOf(alice), 700u256;
-    assert_eq token.balanceOf(bob),   300u256;
+    assert_eq token.balanceOf(alice), 700u256, "alice balance after transfer";
+    assert_eq token.balanceOf(bob),   300u256, "bob balance after transfer";
   }
 
   fn test_transfer_insufficient_reverts(token: TRC20) {
@@ -96,6 +117,35 @@ test TRC20Test {
     assert_event Transfer(from: alice, to: bob, value: 100u256);
   }
 
+  -- Parameterized test: runs once per row in the cases table
+  #[cases]
+  fn test_transfer_various_amounts(token: TRC20,
+      amount: u256, alice_after: u256, bob_after: u256) {
+    with msg.sender = alice {
+      token.transfer(bob, amount);
+    }
+    assert_eq token.balanceOf(alice), alice_after;
+    assert_eq token.balanceOf(bob),   bob_after;
+  } cases {
+    | amount  | alice_after | bob_after |
+    | 1u256   | 999u256     | 1u256     |
+    | 500u256 | 500u256     | 500u256   |
+    | 1000u256| 0u256       | 1000u256  |
+  }
+
+  -- assert_all: all sub-assertions are evaluated; all failures reported together
+  fn test_balances_consistent(token: TRC20) {
+    with msg.sender = alice {
+      token.transfer(bob, 400u256);
+    }
+    assert_all {
+      assert_eq   token.balanceOf(alice), 600u256, "alice";
+      assert_eq   token.balanceOf(bob),   400u256, "bob";
+      assert_eq   token.totalSupply(),    1000u256, "supply unchanged";
+      assert_gt   token.balanceOf(alice), 0u256,    "alice non-zero";
+    }
+  }
+
   fn test_approve_and_transfer_from(token: TRC20) {
     with msg.sender = alice {
       token.approve(charlie, 400u256);
@@ -105,6 +155,24 @@ test TRC20Test {
     }
     assert_eq token.balanceOf(bob),   100u256;
     assert_eq token.balanceOf(alice), 900u256;
+  }
+
+  -- Instruction limit: assert function executes within N VM instructions
+  fn test_transfer_gas_bound(token: TRC20) {
+    with msg.sender = alice {
+      assert_instructions_le(5000) {
+        token.transfer(bob, 100u256);
+      }
+    }
+  }
+
+  -- Fuzz entry point: runner feeds mutated inputs, detects panics/unexpected reverts
+  #[fuzz]
+  fn fuzz_transfer(token: TRC20, amount: u256) {
+    with msg.sender = alice {
+      -- must not panic (unexpected revert allowed; assert_revert is separate)
+      token.transfer(bob, amount);
+    }
   }
 
 }
@@ -119,36 +187,36 @@ test TRC20Test {
 ```
 test <Name> {
   <let-decls>
-  setup -> (<bindings>) { <body> }
-  teardown (<bindings>) { <body> }       -- optional, runs after each test
-  fn test_<name>(<bindings>) { <body> }  -- one or more test functions
+  setup_suite -> (<bindings>) { <body> }    -- once before all tests
+  setup       -> (<bindings>) { <body> }    -- before each test
+  teardown       (<bindings>) { <body> }    -- after each test
+  teardown_suite (<bindings>) { <body> }    -- once after all tests
+
+  #[attr]
+  fn test_<name>(<bindings>) { <body> }     -- test functions
+  fn helper_<name>(...) { <body> }          -- helper (not run directly)
+
+  #[cases]
+  fn test_<name>(<bindings>, <params>) { <body> } cases { <table> }
+  #[fuzz]
+  fn fuzz_<name>(<bindings>, <params>) { <body> }
 }
 ```
 
-- `<Name>` is a label used for reporting; it does not declare a TOL contract.
-- Any number of `fn test_*` functions may appear.
-- Only functions prefixed `test_` are executed by the runner.
-- Helper functions without the `test_` prefix are compiled but not run directly.
+- Only functions prefixed `test_` or `fuzz_` are executed by the runner.
+- Helper functions (any other prefix) are compiled but not run directly.
 
-### 4.2 Setup and teardown
+### 4.2 Lifecycle hooks
 
-```tol
-setup -> (token: TRC20, other: SomeContract) {
-  deploy TRC20(owner: alice, supply: 1000u256) -> token;
-  deploy SomeContract() -> other;
-}
+| Hook | JUnit equivalent | When it runs |
+|------|-----------------|--------------|
+| `setup_suite` | `@BeforeClass` | Once, before any test in the block |
+| `setup` | `@Before` | Before each `test_*` function |
+| `teardown` | `@After` | After each `test_*` function (pass or fail) |
+| `teardown_suite` | `@AfterClass` | Once, after all tests in the block |
 
-teardown (token: TRC20) {
-  -- cleanup if needed (usually not necessary; state is isolated per test)
-}
-```
-
-- `setup` is called before each test function.
-- The return bindings of `setup` are passed as parameters to each test function
-  by name matching.
-- If a test function omits a binding, that contract is still deployed but not
-  passed to the function.
-- `teardown` receives the same bindings and runs after each test (pass or fail).
+`setup_suite` bindings are shared across all test functions (read-only contracts,
+global registries, etc.). `setup` bindings are fresh per test.
 
 ### 4.3 deploy statement
 
@@ -157,83 +225,155 @@ deploy <ContractName>(<arg>, ...) -> <binding>;
 ```
 
 - Calls the contract constructor with the given arguments.
-- The result is a test handle bound to `<binding>`.
-- Each `deploy` produces an isolated storage namespace; two deployed instances
-  of the same contract do not share storage.
+- Each `deploy` produces an isolated storage namespace.
+- Two deployed instances of the same contract do not share storage.
 
 ### 4.4 Call context block
 
 ```tol
 with msg.sender = <addr> { <stmts> }
 with msg.sender = <addr>, msg.value = <val> { <stmts> }
+with block.number = <n> { <stmts> }
 ```
 
 - Overrides call context fields for the duration of the block.
 - Context is restored to its previous value on block exit (even on revert).
-- Nesting is allowed:
-  ```tol
-  with msg.sender = alice {
-    with msg.value = 100u256 {
-      token.deposit();
-    }
-  }
-  ```
+- Nesting is allowed.
 
 ### 4.5 Assertions
 
-#### assert_eq / assert_ne
+#### Equality and comparison
 
 ```tol
-assert_eq <expr>, <expr>;
-assert_ne <expr>, <expr>;
+assert_eq  <expr>, <expr>;
+assert_eq  <expr>, <expr>, <"message">;   -- custom failure message
+assert_ne  <expr>, <expr>;
+assert_ne  <expr>, <expr>, <"message">;
+assert_gt  <expr>, <expr>;                -- greater than (u256/i256)
+assert_ge  <expr>, <expr>;                -- greater or equal
+assert_lt  <expr>, <expr>;                -- less than
+assert_le  <expr>, <expr>;                -- less or equal
+assert_between <expr>, <low>, <high>;     -- low <= expr <= high
 ```
 
-Fails the test immediately with a descriptive message if the condition does not hold.
-
-#### assert_revert
+#### Boolean
 
 ```tol
-assert_revert(<message>) { <stmts> }
-assert_revert { <stmts> }   -- accepts any revert
-```
-
-- Asserts that the body reverts.
-- If `<message>` is given, asserts the revert message matches exactly.
-- After a successful `assert_revert`, storage state is verified to be unchanged
-  (the runner snapshots state before the block and diffs after).
-- If the body does **not** revert, the test fails.
-
-#### assert_event
-
-```tol
-assert_event <EventName>(<field>: <value>, ...);
-```
-
-- Asserts that the most recently emitted event matches the given name and field values.
-- Fields may be omitted to perform partial matching.
-- `assert_no_event` asserts that no event was emitted since the last check.
-
-#### assert / assert_true / assert_false
-
-```tol
-assert <bool_expr>;
+assert       <bool_expr>;
+assert       <bool_expr>, <"message">;
 assert_true  <bool_expr>;
 assert_false <bool_expr>;
 ```
 
-### 4.6 Direct storage inspection (white-box testing)
+#### Grouped assertions (report all failures)
 
-Within a test file, storage slots of a deployed contract instance are readable
-via the `inspect` operator:
+```tol
+assert_all {
+  assert_eq a, b, "label a";
+  assert_eq c, d, "label d";
+  assert_gt e, 0u256;
+}
+```
+
+Unlike sequential assertions that stop at the first failure, `assert_all` runs
+every sub-assertion and reports all failures together — equivalent to JUnit 5's
+`assertAll()`.
+
+#### Revert assertion
+
+```tol
+assert_revert(<message>) { <stmts> }  -- exact message match
+assert_revert                { <stmts> }  -- any revert
+```
+
+- Storage state is snapshotted before the block and verified unchanged after.
+- If the body does **not** revert, the test fails.
+
+#### Event assertion
+
+```tol
+assert_event <EventName>(<field>: <value>, ...);   -- full match
+assert_event <EventName>();                          -- name only (partial)
+assert_no_event;                                     -- nothing emitted
+```
+
+#### Instruction limit (gas budget)
+
+```tol
+assert_instructions_le(<n>) { <stmts> }
+```
+
+Asserts the VM executes at most `<n>` instructions for the enclosed statements.
+Equivalent to JTest performance assertions; ensures critical paths stay within
+predictable cost bounds.
+
+### 4.6 Test attributes
+
+```tol
+#[skip]              -- exclude from run (JUnit @Disabled)
+#[tag("name")]       -- group by tag; tol test -tag name
+#[cases]             -- parameterized (see §4.7)
+#[fuzz]              -- fuzz entry point (see §4.8)
+#[timeout(ms)]       -- fail if setup+test+teardown exceeds wall-clock ms
+```
+
+### 4.7 Parameterized tests
+
+```tol
+#[cases]
+fn test_<name>(token: TRC20, col1: type1, col2: type2) { ... }
+cases {
+  | col1   | col2   |
+  | val1a  | val2a  |
+  | val1b  | val2b  |
+}
+```
+
+The runner expands each row into a separate named test:
+`TRC20Test/test_transfer_various_amounts[0]`, `[1]`, `[2]`, ...
+
+Equivalent to JUnit 5 `@ParameterizedTest` + `@CsvSource`.
+
+### 4.8 Fuzz tests
+
+```tol
+#[fuzz]
+fn fuzz_<name>(token: TRC20, param: u256) { ... }
+```
+
+- The runner feeds randomly mutated inputs, looking for unexpected panics or
+  invariant violations.
+- Fuzz functions must not use `assert_revert`; an unexpected revert (one not
+  triggered by a business-logic `require`) counts as a failure.
+- Run with: `tol test -fuzz fuzz_transfer -fuzztime 30s`
+- Deterministic: the fuzz corpus is seeded with a fixed seed; results are
+  reproducible given the same seed and corpus.
+
+### 4.9 Mock contracts
+
+```tol
+mock TRC20Mock : TRC20 {
+  fn transfer(to: address, amount: u256) -> (ok: bool) {
+    return true;   -- always succeeds without touching storage
+  }
+}
+```
+
+- `mock` declares a stub contract that implements the same interface as the real
+  contract but with controlled, simplified behavior.
+- Useful for testing contracts that call external TRC20 tokens without deploying
+  the full token implementation.
+- Equivalent to Mockito `mock()` + `when().thenReturn()`.
+
+### 4.10 Direct storage inspection (white-box testing)
 
 ```tol
 let supply: u256 = inspect token.total_supply;
 assert_eq supply, 1000u256;
 ```
 
-`inspect` is available only in test files and is not part of the production language.
-It bypasses the function call interface to read storage directly — useful for
-verifying invariants without requiring a public getter.
+`inspect` is available only in test files. It bypasses the function call interface
+to read storage directly — useful for verifying invariants without a public getter.
 
 ---
 
@@ -242,10 +382,15 @@ verifying invariants without requiring a public getter.
 ### 5.1 Invocation
 
 ```sh
-tol test ./...              # run all *_test.tol files recursively
-tol test ./trc20_test.tol   # run a specific test file
-tol test -run test_transfer  # run tests whose name matches a pattern
-tol test -v                  # verbose: print each test name as it runs
+tol test ./...                        # run all *_test.tol files recursively
+tol test ./trc20_test.tol             # run a specific test file
+tol test -run test_transfer           # name pattern filter
+tol test -tag slow                    # run only tests tagged "slow"
+tol test -skip slow                   # exclude tests tagged "slow"
+tol test -v                           # verbose output
+tol test -cover                       # enable coverage collection
+tol test -covermin 80                 # fail if coverage < 80%
+tol test -fuzz fuzz_transfer -fuzztime 30s   # fuzz mode
 ```
 
 ### 5.2 Execution model
@@ -253,80 +398,83 @@ tol test -v                  # verbose: print each test name as it runs
 For each test function:
 
 1. A fresh Lua VM state is created.
-2. `setup` is called; its bound contracts are deployed into isolated storage.
-3. The test function runs.
-4. `teardown` (if declared) runs.
-5. The VM state is discarded; no state persists to the next test.
+2. `setup_suite` bindings (if any) are passed in from the suite-level deployment.
+3. `setup` is called; its bound contracts are deployed into isolated storage.
+4. The test function runs.
+5. `teardown` runs (pass or fail).
+6. The VM state is discarded; no state persists to the next test.
+7. After all tests, `teardown_suite` runs.
 
 Tests within a `test` block run sequentially in declaration order.
-Parallel execution may be added in a future version.
 
 ### 5.3 Output format
 
 ```
---- PASS: TRC20Test/test_constructor_sets_supply     (0.001s)
---- PASS: TRC20Test/test_constructor_credits_owner   (0.001s)
---- PASS: TRC20Test/test_transfer_moves_balance       (0.002s)
---- FAIL: TRC20Test/test_transfer_insufficient_reverts
-    trc20_test.tol:41: assert_eq failed: got 999, want 1000
---- PASS: TRC20Test/test_transfer_emits_event         (0.001s)
+--- PASS: TRC20Test/test_constructor_sets_supply          (0.001s)
+--- PASS: TRC20Test/test_constructor_credits_owner        (0.001s)
+--- PASS: TRC20Test/test_transfer_moves_balance            (0.002s)
+--- PASS: TRC20Test/test_transfer_various_amounts[0]      (0.001s)
+--- PASS: TRC20Test/test_transfer_various_amounts[1]      (0.001s)
+--- PASS: TRC20Test/test_transfer_various_amounts[2]      (0.001s)
+--- FAIL: TRC20Test/test_balances_consistent
+    trc20_test.tol:58: assert_all failed (2 of 4):
+      alice: assert_eq failed: got 601, want 600
+      bob:   assert_eq failed: got 399, want 400
+--- SKIP: TRC20Test/test_wip_feature                      (#[skip])
 
-FAIL    trc20_test.tol  [1 failure]
+FAIL    trc20_test.tol  [1 failure, 1 skip]
 ```
 
 ### 5.4 Exit codes
 
-- `0` — all tests passed
-- `1` — one or more tests failed
-- `2` — compilation error in test or contract file
+| Code | Meaning |
+|------|---------|
+| `0` | All tests passed |
+| `1` | One or more tests failed |
+| `2` | Compilation error in test or contract file |
+| `3` | Coverage below `-covermin` threshold |
 
 ---
 
 ## 6. Coverage
 
-The runner collects coverage automatically when invoked with `-cover`:
-
-```sh
-tol test -cover ./...
-```
-
-Coverage is reported at three granularities:
+The runner collects coverage automatically when invoked with `-cover`.
 
 ### 6.1 Function coverage
 
-Which public functions were called at least once across the test suite.
+Which public functions were called at least once.
 
 ```
 trc20.tol  function coverage:
-  totalSupply()                    called  ✓
-  balanceOf(address)               called  ✓
-  transfer(address, u256)          called  ✓
-  approve(address, u256)           called  ✓
-  transferFrom(address, address, u256)  called  ✓
-  fallback                         not called  ✗
+  totalSupply()                          called  ✓
+  balanceOf(address)                     called  ✓
+  transfer(address, u256)                called  ✓
+  approve(address, u256)                 called  ✓
+  transferFrom(address, address, u256)   called  ✓
+  fallback                               NOT called  ✗
 
 Function coverage: 5/6 (83%)
 ```
 
 ### 6.2 Branch coverage
 
-Which conditional branches (`if`/`else`, `require` pass/fail paths) were taken.
+Which conditional branches (`if`/`else`, `require` pass/fail) were taken.
 
 ```
 trc20.tol  branch coverage:
-  transfer:31  require pass    ✓
-  transfer:31  require fail    ✓
+  transfer:31  require pass   ✓
+  transfer:31  require fail   ✓
   transferFrom:56  require pass  ✓
   transferFrom:56  require fail  ✓
   transferFrom:61  require pass  ✓
-  transferFrom:61  require fail  ✗   -- not tested
+  transferFrom:61  require fail  ✗
 
 Branch coverage: 5/6 (83%)
 ```
 
 ### 6.3 Storage slot coverage
 
-Which storage slots were read and written during the test suite.
+Which storage slots were read and written.
 
 ```
 trc20.tol  storage slot coverage:
@@ -335,50 +483,130 @@ trc20.tol  storage slot coverage:
   allowances       read ✓  written ✓
 ```
 
-### 6.4 Coverage output formats
+### 6.4 Cyclomatic complexity
+
+The runner reports cyclomatic complexity (CC) per function — the number of
+linearly independent paths through the function. Functions with CC > 10 are
+flagged as candidates for additional test cases.
+
+```
+trc20.tol  cyclomatic complexity:
+  totalSupply()                   CC=1  ✓
+  balanceOf(address)              CC=1  ✓
+  transfer(address, u256)         CC=3  ✓
+  approve(address, u256)          CC=1  ✓
+  transferFrom(address,address,u256)  CC=5  ✓
+```
+
+Equivalent to JaCoCo's complexity metric. High CC means the function has many
+possible execution paths and likely needs more parameterized test cases.
+
+### 6.5 Coverage threshold enforcement
 
 ```sh
-tol test -cover -coverformat=text   # terminal table (default)
-tol test -cover -coverformat=json   # machine-readable JSON
-tol test -cover -coverformat=html   # annotated source HTML
+tol test -cover -covermin 80
 ```
+
+Exits with code 3 if any coverage dimension (function, branch) falls below the
+specified percentage. Enforces coverage discipline in CI pipelines — equivalent
+to JaCoCo Maven plugin `<haltOnFailure>` with minimum ratio rules.
+
+### 6.6 Coverage output formats
+
+```sh
+tol test -cover -coverformat=text    # terminal table (default)
+tol test -cover -coverformat=json    # machine-readable JSON
+tol test -cover -coverformat=html    # annotated source HTML
+```
+
+HTML output annotates each source line with a color indicating coverage status,
+identical in concept to JaCoCo's HTML report.
 
 ---
 
 ## 7. Design Constraints
 
 1. **No production impact** — `*_test.tol` files are never compiled into deployment
-   artifacts. The `inspect` operator, `deploy` statement, `assert_*` builtins, and
-   `with` context blocks are test-only and rejected by the production compiler.
+   artifacts. All test-only constructs (`inspect`, `deploy`, `assert_*`, `with`,
+   `mock`, `#[fuzz]`, `#[cases]`) are rejected by the production compiler.
 
-2. **Storage isolation** — each test function runs against a fresh VM state.
-   No global mutable state is shared between tests.
+2. **Storage isolation** — each `test_*` function runs against a fresh VM state.
+   No global mutable state is shared between test functions.
 
-3. **Determinism** — tests are deterministic by construction (same as production
-   contracts). No wall-clock time, randomness, or host OS access.
+3. **Determinism** — tests are deterministic by construction. No wall-clock time,
+   OS randomness, or non-deterministic host access. Fuzz seeds are explicit and
+   reproducible.
 
 4. **Revert isolation** — a revert inside `assert_revert { }` does not propagate
    to the test function. State is snapshotted and restored automatically.
 
-5. **Minimal new syntax** — `test`, `setup`, `teardown`, `deploy`, `with`,
-   `inspect`, `assert_eq`, `assert_ne`, `assert_revert`, `assert_event` are the
-   complete set of test-only additions. No other test-specific keywords are needed.
+5. **Fail fast vs. report all** — sequential assertions fail immediately on the
+   first failure. `assert_all { }` collects all failures and reports them together.
 
 ---
 
-## 8. Comparison with Existing Approaches
+## 8. Comparison with JTest, JaCoCo, and Other Frameworks
 
-| Feature | Go (`testing`) | Rust (`#[test]`) | Hardhat/Foundry | TOL |
-|---------|---------------|-----------------|-----------------|-----|
-| Built into language | Yes | Yes | No (JS/TS framework) | Yes |
-| File isolation | `_test.go` | same file or `tests/` | separate `.js/.ts` | `_test.tol` |
-| Contract deploy | N/A | N/A | `deployContract()` | `deploy` statement |
-| Call context | N/A | N/A | `connect(signer)` | `with msg.sender` |
-| Revert assertion | N/A | `#[should_panic]` | `expect(...).to.be.reverted` | `assert_revert { }` |
-| Event assertion | N/A | N/A | `expect(...).to.emit` | `assert_event` |
-| Storage inspection | N/A | N/A | `ethers.provider.getStorage` | `inspect` |
-| Coverage built-in | Yes (`-cover`) | Yes (`cargo llvm-cov`) | No (external) | Yes (`-cover`) |
-| State isolation | per-test function | per-test function | manual `beforeEach` | automatic per-test |
+| Feature | JUnit 5 | JTest (Parasoft) | JaCoCo | Hardhat/Foundry | TOL |
+|---------|---------|-----------------|--------|-----------------|-----|
+| Built into language | No (library) | No (tool) | No (tool) | No (framework) | **Yes** |
+| File isolation | same file | same file | N/A | separate `.ts` | `_test.tol` |
+| Per-test setup | `@Before` | `@Before` | N/A | `beforeEach` | `setup` |
+| Suite-level setup | `@BeforeClass` | `@BeforeClass` | N/A | `before` | `setup_suite` |
+| Skip test | `@Disabled` | `@Disabled` | N/A | `.skip` | `#[skip]` |
+| Test tags | `@Tag` | `@Category` | N/A | custom | `#[tag]` |
+| Parameterized | `@ParameterizedTest` | `@DataProvider` | N/A | manual loop | `#[cases]` |
+| Fuzz testing | No | Yes (auto-gen) | N/A | Foundry `-fuzz` | `#[fuzz]` |
+| Custom assert message | Yes | Yes | N/A | Yes | Yes |
+| Grouped assertions | `assertAll()` | No | N/A | No | `assert_all {}` |
+| Exception/revert | `assertThrows` | `assertThrows` | N/A | `.to.be.reverted` | `assert_revert {}` |
+| State unchanged on revert | No (manual) | No | N/A | No (manual) | **Automatic** |
+| Event assertion | No | No | N/A | `.to.emit` | `assert_event` |
+| Mock objects | Mockito | Built-in | N/A | Manual stubs | `mock` contract |
+| Storage inspection | No | No | N/A | `getStorage()` | `inspect` |
+| Contract deploy | N/A | N/A | N/A | `deployContract` | `deploy` statement |
+| Call context override | N/A | N/A | N/A | `connect(signer)` | `with msg.sender` |
+| Instruction limit | `@Timeout` (wall) | Perf assert | N/A | No | `assert_instructions_le` |
+| Function coverage | No | Yes | Yes | No | Yes |
+| Branch coverage | No | Yes | Yes | No | Yes |
+| Storage slot coverage | N/A | N/A | N/A | N/A | **Yes (unique)** |
+| Cyclomatic complexity | No | Yes | Yes | No | Yes |
+| Coverage threshold | No | Yes | Yes | No | `-covermin` |
+| Coverage HTML | No | Yes | Yes | No | Yes |
+| Auto test generation | No | **Yes** | N/A | No | Not yet (P5) |
+| State isolation | Manual | Manual | N/A | Manual `beforeEach` | **Automatic** |
+| Determinism guarantee | No | No | N/A | No | **Yes** |
+
+### What JTest has that TOL does not (yet)
+
+1. **Automatic test generation** — JTest analyzes code paths and generates test
+   cases automatically. This is JTest's most powerful enterprise feature. TOL plans
+   this as a future milestone (P5: AI-assisted test generation from contract source).
+
+2. **Static analysis integration** — JTest runs static analysis (null pointer,
+   resource leak, OWASP checks) alongside tests. TOL's equivalent is the
+   compiler verifier (§15 of TOL_SPEC.md), which runs before codegen.
+
+3. **Compliance rule sets** — JTest supports MISRA, CERT, OWASP profiles. TOL
+   could add a compliance profile for common DeFi vulnerability patterns (see
+   TOL_AUDIT.md), but this is not in the current design.
+
+### What TOL has that JTest does not
+
+1. **Storage slot coverage** — tracking which storage slots were read/written is
+   unique to TOL and has no JTest equivalent. It directly answers "did any test
+   exercise the allowances mapping?" at the storage layer.
+
+2. **Automatic revert state verification** — `assert_revert {}` automatically
+   snapshots and verifies storage unchanged. JTest has no concept of transactional
+   state rollback in tests.
+
+3. **Call context injection** — `with msg.sender = X { }` is native syntax.
+   Hardhat requires `contract.connect(signer)` which is external framework glue.
+
+4. **Determinism by construction** — TOL tests are deterministic because the
+   runtime is deterministic. JTest tests can depend on system time, random seeds,
+   OS scheduling, etc.
 
 ---
 
@@ -388,6 +616,8 @@ tol test -cover -coverformat=html   # annotated source HTML
 |-------|-------------|
 | P0 | `*_test.tol` file recognition; `test` block parsing; `deploy`/`with`/`assert_eq`/`assert_revert` |
 | P1 | `setup`/`teardown` lifecycle; storage isolation per test; basic pass/fail reporting |
-| P2 | `assert_event`; `inspect` operator; coverage (function + branch) |
-| P3 | Coverage HTML output; `-run` pattern filter; parallel test execution |
-| P4 | Differential testing against reference Solidity implementation |
+| P2 | `setup_suite`/`teardown_suite`; `assert_event`; `inspect`; `#[skip]`; `#[tag]`; custom messages |
+| P3 | `assert_all`; `assert_gt/lt/between`; `assert_instructions_le`; `#[cases]` parameterized tests |
+| P4 | Coverage (function + branch + storage slot + cyclomatic complexity); HTML output; `-covermin` |
+| P5 | `#[fuzz]` fuzz entry points; `mock` contracts; differential testing vs. reference Solidity |
+| P6 | AI-assisted test generation from contract source (equivalent to JTest auto-generation) |
