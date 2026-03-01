@@ -80,7 +80,7 @@ Current parser/sema coverage in this branch:
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    selector-member assignment-target rejection (`*.selector` is read-only),
    assignment-expression placement checks (value-context rejection, including
-   `require/assert` expressions and `emit` payload arguments),
+   `require/assert` expressions, `revert` payloads, and `emit` payload arguments),
    non-void function return-path checks for current structured subset
    (all paths must value-return or `revert`; loops still conservative),
    statement-shape checks for current subset (`require/assert` condition + string-literal message payload,

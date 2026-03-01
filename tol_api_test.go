@@ -600,6 +600,24 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsAssignExprInRevertPayload(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    revert (x = 1);
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected assignment-placement error")
+	}
+	if !strings.Contains(err.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsEmitDeclaredEventArityMismatch(t *testing.T) {
 	src := []byte(`
 tol 0.2

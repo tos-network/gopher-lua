@@ -290,6 +290,13 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				})
 			}
 		case "revert":
+			if containsAssignExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in revert payload",
+					Span:    defaultSpan(filename),
+				})
+			}
 			if s.Expr != nil && !isStringLiteralExpr(s.Expr) {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidRevert,

@@ -2730,6 +2730,41 @@ func TestCheckRejectsRevertNonStringPayload(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsAssignExprInRevertPayload(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "revert",
+							Expr: &ast.Expr{
+								Kind: "assign",
+								Op:   "=",
+								Left: &ast.Expr{Kind: "ident", Value: "x"},
+								Right: &ast.Expr{
+									Kind:  "number",
+									Value: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
 func TestCheckAcceptsRevertStringOrEmpty(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
