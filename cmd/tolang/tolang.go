@@ -24,7 +24,7 @@ func main() {
 
 func mainAux() int {
 	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc, opt_ctor, opt_vtocsrc string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj bool
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
@@ -45,6 +45,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_vtoc, "vtoc", false, "")
 	flag.BoolVar(&opt_dtor, "dtor", false, "")
 	flag.BoolVar(&opt_dtorj, "dtorj", false, "")
+	flag.BoolVar(&opt_vtor, "vtor", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: tolang [options] [script [args]].
 	Available options are:
@@ -65,6 +66,7 @@ func mainAux() int {
 	  -dtorj   dump parsed TOR archive metadata as JSON
 	  -vtoc    validate TOC artifact and return status
 	  -vtocsrc file  optional source file to verify TOC source_hash (use with -vtoc)
+	  -vtor    validate TOR artifact and return status
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -114,8 +116,12 @@ func mainAux() int {
 		fmt.Println("cannot use -dtor and -dtorj together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, or -dtorj")
+	if opt_vtor && (opt_dtor || opt_dtorj) {
+		fmt.Println("cannot use -vtor with -dtor/-dtorj together")
+		return 1
+	}
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, or -vtor")
 		return 1
 	}
 
@@ -387,6 +393,14 @@ func mainAux() int {
 					return 1
 				}
 				fmt.Println(string(b))
+				return 0
+			}
+			if opt_vtor {
+				if _, err := lua.DecodeTOR(src); err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Println("TOR: ok")
 				return 0
 			}
 			if opt_dt || opt_dc || opt_di {

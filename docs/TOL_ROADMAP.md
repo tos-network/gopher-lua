@@ -70,6 +70,7 @@ Recent verifier hardening completed in this phase:
      (`manifest.name`/`manifest.version` required)
    - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
      and archive inspection
+   - CLI strict TOR validation path (`-vtor`)
 
 ---
 

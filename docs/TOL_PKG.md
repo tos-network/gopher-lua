@@ -25,6 +25,7 @@ Currently landed in `tolang`:
   - `tolang -ctor out.tor <package_dir>`
   - `tolang -dtor artifact.tor`
   - `tolang -dtorj artifact.tor`
+  - `tolang -vtor artifact.tor`
 
 Not landed yet:
 
