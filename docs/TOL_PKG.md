@@ -636,7 +636,7 @@ tol test --fuzz fuzz_transfer --fuzz-time 30s
 | `tolang -ctoi out.toi -ctoiname X input.tol` | `tol compile --emit toi --name X -o out.toi input.tol` |
 | `tolang -dtoi interface.toi` | `tol inspect interface.toi` |
 | `tolang -ctor out.tor input.tol` | `tol compile --emit tor -o out.tor input.tol` |
-| `tolang -ctorpkg n -ctorver v -ctorifacename X -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --interface-name X --include-source -o out.tor in.tol` |
+| `tolang -ctorpkg n -ctorver v -ctorifacename X -ctorsrc -ctor out.tor in.tol` | `tol compile --emit tor --package-name n --package-version v --name X --include-source -o out.tor in.tol` |
 | `tolang -ctor out.tor ./dir/` | `tol pack -o out.tor ./dir/` |
 | `tolang -dtoc artifact.toc` | `tol inspect artifact.toc` |
 | `tolang -dtocj artifact.toc` | `tol inspect --json artifact.toc` |

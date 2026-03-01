@@ -645,13 +645,17 @@ Miscellaneous notes
 ----------------------------------------------------------------
 Standalone interpreter
 ----------------------------------------------------------------
-Lua has an interpreter called ``lua`` . This fork ships an interpreter called ``tolang`` .
+Lua has an interpreter called ``lua`` . This fork ships an interpreter called ``tol`` (built from ``./cmd/tolang``).
 
 .. code-block:: bash
 
-   go build ./cmd/tolang
+   go build -o tol ./cmd/tolang
+   ./tol --help
+   ./tol compile contract.tol
+   ./tol inspect contract.toc
+   ./tol verify contract.toc
 
-``tolang`` has same options as ``lua`` .
+Legacy Lua-mode flags remain available for compatibility.
 
 ----------------------------------------------------------------
 How to Contribute

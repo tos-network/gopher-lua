@@ -161,12 +161,19 @@ Bytecode safety checks:
 - VM fingerprint check (package/language/numeric/opcode profile)
 - payload SHA-256 integrity check
 
-## tolang CLI
+## tol CLI
 
 ```bash
-go build ./cmd/tolang
-./tolang script.lua
+go build -o tol ./cmd/tolang
+./tol --help
+./tol compile contract.tol
+./tol inspect contract.toc
+./tol verify contract.toc
+./tol pack -o out.tor ./contracts/
 ```
+
+Legacy Lua/VM flat-flag modes are still available for compatibility, e.g.
+`./tol -e "x=1"`, `./tol -di script.lua`, `./tolang -ctoc out.toc input.tol`.
 
 ## Module
 
