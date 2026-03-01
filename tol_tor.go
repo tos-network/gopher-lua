@@ -276,22 +276,31 @@ func validateTORManifest(manifestJSON []byte, files map[string][]byte, verifyRef
 	}
 	if verifyRefs {
 		for _, c := range m.Contracts {
+			cname := strings.TrimSpace(c.Name)
+			if cname == "" {
+				return fmt.Errorf("tor manifest contracts entry requires non-empty 'name'")
+			}
+			hasTOC := strings.TrimSpace(c.TOC) != ""
+			hasTOI := strings.TrimSpace(c.TOI) != ""
+			if !hasTOC && !hasTOI {
+				return fmt.Errorf("tor manifest contract %q must declare at least one of 'toc' or 'toi'", cname)
+			}
 			if p := strings.TrimSpace(c.TOC); p != "" {
 				np, err := normalizeTORPath(p)
 				if err != nil {
-					return fmt.Errorf("tor manifest contract %q has invalid toc path %q: %w", c.Name, p, err)
+					return fmt.Errorf("tor manifest contract %q has invalid toc path %q: %w", cname, p, err)
 				}
 				if _, ok := files[np]; !ok {
-					return fmt.Errorf("tor manifest contract %q references missing toc file %q", c.Name, np)
+					return fmt.Errorf("tor manifest contract %q references missing toc file %q", cname, np)
 				}
 			}
 			if p := strings.TrimSpace(c.TOI); p != "" {
 				np, err := normalizeTORPath(p)
 				if err != nil {
-					return fmt.Errorf("tor manifest contract %q has invalid toi path %q: %w", c.Name, p, err)
+					return fmt.Errorf("tor manifest contract %q has invalid toi path %q: %w", cname, p, err)
 				}
 				if _, ok := files[np]; !ok {
-					return fmt.Errorf("tor manifest contract %q references missing toi file %q", c.Name, np)
+					return fmt.Errorf("tor manifest contract %q references missing toi file %q", cname, np)
 				}
 			}
 		}

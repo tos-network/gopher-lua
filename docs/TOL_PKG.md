@@ -16,7 +16,8 @@ Scope: File formats, package layout, standard library, and on-chain registry
 - `CompileTOLToTOR(source, name, opts)` — one-shot `.tol` → minimal `.tor`
 - `EncodeTOC(...)` / `DecodeTOC(...)` / `VerifyTOCSourceHash(toc, sourceBytes)`
 - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
-  (`DecodeTOR` validates embedded `.toc`/`.toi` entries)
+  (`contracts[*].name` and at least one of `toc`/`toi` are required;
+  `DecodeTOR` validates embedded `.toc`/`.toi` entries)
 
 ### CLI (current — flat-flag style, to be migrated)
 
