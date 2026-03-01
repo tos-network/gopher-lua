@@ -317,7 +317,7 @@ contract Demo {
 	}
 }
 
-func TestBuildIRFromTOLRejectsRequireWithoutExpr(t *testing.T) {
+func TestBuildIRFromTOLRejectsRequireMissingParenExpr(t *testing.T) {
 	src := []byte(`
 tol 0.2
 contract Demo {
@@ -329,10 +329,10 @@ contract Demo {
 `)
 	_, err := BuildIRFromTOL(src, "<tol>")
 	if err == nil {
-		t.Fatalf("expected statement-shape error")
+		t.Fatalf("expected parse error")
 	}
-	if !strings.Contains(err.Error(), "TOL2021") {
-		t.Fatalf("expected TOL2021 sema error, got: %v", err)
+	if !strings.Contains(err.Error(), "TOL1001") {
+		t.Fatalf("expected TOL1001 parse error, got: %v", err)
 	}
 }
 
