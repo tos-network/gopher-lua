@@ -106,10 +106,10 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		}
 		for _, ev := range m.Contract.Events {
 			evName := strings.TrimSpace(ev.Name)
-			if evName == "selector" {
+			if evName == "selector" || evName == "this" {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaReservedName,
-					Message: "event name 'selector' is reserved for builtin selector(...)",
+					Message: fmt.Sprintf("event name '%s' is reserved and cannot be declared", evName),
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -137,10 +137,10 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			slotSeen := map[string]struct{}{}
 			for _, slot := range m.Contract.Storage.Slots {
 				slotName := strings.TrimSpace(slot.Name)
-				if slotName == "selector" {
+				if slotName == "selector" || slotName == "this" {
 					diags = append(diags, diag.Diagnostic{
 						Code:    diag.CodeSemaReservedName,
-						Message: "storage slot name 'selector' is reserved for builtin selector(...)",
+						Message: fmt.Sprintf("storage slot name '%s' is reserved and cannot be declared", slotName),
 						Span:    defaultSpan(filename),
 					})
 				}
@@ -179,10 +179,10 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		selectorSeen := map[string]string{}
 		for _, fn := range m.Contract.Functions {
 			name := strings.TrimSpace(fn.Name)
-			if name == "selector" {
+			if name == "selector" || name == "this" {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaReservedName,
-					Message: "function name 'selector' is reserved for builtin selector(...)",
+					Message: fmt.Sprintf("function name '%s' is reserved and cannot be declared", name),
 					Span:    defaultSpan(filename),
 				})
 			}

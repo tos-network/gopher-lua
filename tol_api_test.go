@@ -180,6 +180,24 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsReservedFunctionNameThis(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn this() public {
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected reserved-name error")
+	}
+	if !strings.Contains(err.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsReservedFunctionNamePrefixTol(t *testing.T) {
 	src := []byte(`
 tol 0.2
@@ -214,12 +232,46 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsReservedEventNameThis(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event this(a: u256)
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected reserved-name error")
+	}
+	if !strings.Contains(err.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsReservedStorageNamePrefixTol(t *testing.T) {
 	src := []byte(`
 tol 0.2
 contract Demo {
   storage {
     slot __tol_internal: u256;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected reserved-name error")
+	}
+	if !strings.Contains(err.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsReservedStorageNameThis(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot this: u256;
   }
 }
 `)
