@@ -131,20 +131,20 @@ The test suite is stored in `./_lua54-subset-test` and controlled by
 Compile source to bytecode:
 
 ```bash
-glua -c contract.glbc contract.lua
+tolang -c contract.glbc contract.lua
 ```
 
 Execute bytecode:
 
 ```bash
-glua -bc contract.glbc
+tolang -bc contract.glbc
 ```
 
 Dump IR from source or bytecode:
 
 ```bash
-glua -di contract.lua
-glua -di -bc contract.glbc
+tolang -di contract.lua
+tolang -di -bc contract.glbc
 ```
 
 Programmatic APIs:
@@ -161,17 +161,17 @@ Bytecode safety checks:
 - VM fingerprint check (package/language/numeric/opcode profile)
 - payload SHA-256 integrity check
 
-## glua CLI
+## tolang CLI
 
 ```bash
-go build ./cmd/glua
-./glua script.lua
+go build ./cmd/tolang
+./tolang script.lua
 ```
 
 ## Module
 
 ```
-github.com/tos-network/glua
+github.com/tos-network/tolang
 ```
 
 Forked from [yuin/gopher-lua](https://github.com/yuin/gopher-lua) (MIT).

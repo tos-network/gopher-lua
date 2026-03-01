@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/tos-network/glua/ast"
+	"github.com/tos-network/tolang/ast"
 )
 
 const EOF = -1

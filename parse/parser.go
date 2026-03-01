@@ -8,7 +8,7 @@ import __yyfmt__ "fmt"
 //line parser.go.y:2
 
 import (
-	"github.com/tos-network/glua/ast"
+	"github.com/tos-network/tolang/ast"
 )
 
 //line parser.go.y:36

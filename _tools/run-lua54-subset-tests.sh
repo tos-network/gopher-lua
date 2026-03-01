@@ -13,11 +13,11 @@ fi
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-GLUA="$TMPDIR/glua"
+TOLANG="$TMPDIR/tolang"
 COMPILECHECK="$TMPDIR/lua54_compilecheck"
 
 echo "[lua54-subset] building tools..."
-(cd "$ROOT" && go build -o "$GLUA" ./cmd/glua)
+(cd "$ROOT" && go build -o "$TOLANG" ./cmd/tolang)
 (cd "$ROOT" && go build -o "$COMPILECHECK" ./_tools/lua54_compilecheck)
 
 run_with_timeout() {
@@ -63,11 +63,11 @@ while IFS=$'\t' read -r mode file reason; do
 
   case "$mode" in
     runtime)
-      if run_with_timeout "$GLUA" "$san" >/dev/null 2>&1; then
+      if run_with_timeout "$TOLANG" "$san" >/dev/null 2>&1; then
         pass=$((pass+1))
       else
         fail=$((fail+1))
-        out=$(run_with_timeout "$GLUA" "$san" 2>&1 | sed -n '1p' || true)
+        out=$(run_with_timeout "$TOLANG" "$san" 2>&1 | sed -n '1p' || true)
         printf 'runtime\t%s\t%s\n' "$file" "${out:-non-zero exit}" >> "$FAIL_LOG"
       fi
       ;;

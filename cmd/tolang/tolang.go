@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	"github.com/chzyer/readline"
-	"github.com/tos-network/glua"
-	"github.com/tos-network/glua/parse"
+	"github.com/tos-network/tolang"
+	"github.com/tos-network/tolang/parse"
 	"os"
 	"runtime/pprof"
 )
@@ -31,7 +31,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_di, "di", false, "")
 	flag.BoolVar(&opt_bc, "bc", false, "")
 	flag.Usage = func() {
-		fmt.Println(`Usage: glua [options] [script [args]].
+		fmt.Println(`Usage: tolang [options] [script [args]].
 	Available options are:
 	  -e stat  execute string 'stat'
 	  -l name  require library 'name'

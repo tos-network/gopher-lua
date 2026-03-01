@@ -1,4 +1,4 @@
-module github.com/tos-network/glua
+module github.com/tos-network/tolang
 
 go 1.17
 

@@ -645,13 +645,13 @@ Miscellaneous notes
 ----------------------------------------------------------------
 Standalone interpreter
 ----------------------------------------------------------------
-Lua has an interpreter called ``lua`` . GopherLua has an interpreter called ``glua`` .
+Lua has an interpreter called ``lua`` . This fork ships an interpreter called ``tolang`` .
 
 .. code-block:: bash
 
-   go get github.com/yuin/gopher-lua/cmd/glua
+   go build ./cmd/tolang
 
-``glua`` has same options as ``lua`` .
+``tolang`` has same options as ``lua`` .
 
 ----------------------------------------------------------------
 How to Contribute

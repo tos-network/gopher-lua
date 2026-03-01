@@ -8,12 +8,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/tos-network/glua/parse"
+	"github.com/tos-network/tolang/parse"
 )
 
 var bytecodeMagic = [4]byte{'G', 'L', 'B', 'C'}
 
-// BytecodeFormatVersion is the binary format version for glua bytecode.
+// BytecodeFormatVersion is the binary format version for tolang bytecode.
 const BytecodeFormatVersion uint16 = 2
 
 const (
@@ -29,7 +29,7 @@ func bytecodeVMID() string {
 		PackageName, PackageVersion, LuaVersion, LNumberBit, opCodeMax)
 }
 
-// IsBytecode reports whether the input starts with glua bytecode magic bytes.
+// IsBytecode reports whether the input starts with tolang bytecode magic bytes.
 func IsBytecode(data []byte) bool {
 	if len(data) < len(bytecodeMagic) {
 		return false

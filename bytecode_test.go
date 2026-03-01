@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tos-network/glua/parse"
+	"github.com/tos-network/tolang/parse"
 )
 
 func TestIRPipelineAndBytecodeRoundTrip(t *testing.T) {
@@ -106,7 +106,7 @@ func TestLoadAutoDetectsBytecode(t *testing.T) {
 }
 
 func TestLoadSourceStripsShebang(t *testing.T) {
-	src := []byte("#!/usr/bin/env glua\n_result = 9 + 1\n")
+	src := []byte("#!/usr/bin/env tolang\n_result = 9 + 1\n")
 	L := NewState()
 	defer L.Close()
 	fn, err := L.Load(bytes.NewReader(src), "<src>")

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tos-network/glua/ast"
+	"github.com/tos-network/tolang/ast"
 )
 
 // IRInstruction is a normalized representation of one VM instruction.
