@@ -1,6 +1,6 @@
 # TOL Architecture Lock (M0)
 
-Status: Initial lock for implementation kickoff  
+Status: Active snapshot (M0 lock + incremental implementation)  
 Date: 2026-03-01
 
 ## Package Boundaries

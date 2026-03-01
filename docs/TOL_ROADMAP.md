@@ -1,11 +1,29 @@
 # Tolang Implementation Roadmap
 
-Status: Draft v0.1
+Status: Active tracking (updated 2026-03-01)
 Date: 2026-03-01
 Source Spec: `45-IR/TOL_SPEC.md` (Draft v0.2)
 Primary Target: Implement a production canonical pipeline in `tolang`:
 `TOL source -> typed/lowered TOL -> direct IR -> bytecode`, fully covering
 `conditional-tokens-market-makers/contracts/*.sol` semantics.
+
+---
+
+## 0. Current Task Status (2026-03-01)
+
+Milestone progress snapshot:
+
+1. `M0` - Completed (architecture lock + package boundaries + public API skeleton).
+2. `M1` - In progress (parser/lexer subset implemented; full grammar coverage pending).
+3. `M2` - In progress (early semantic checks implemented; full type system pending).
+4. `M3` - Not started.
+5. `M4` - In progress (selector and dispatch subset implemented; typed ABI ops pending).
+6. `M5` - Not started in direct-IR path.
+7. `M6` - Partially complete (existing math intrinsics in runtime; full spec set pending).
+8. `M7` - In progress (direct IR bootstrap pipeline works for restricted subset).
+9. `M8` - Not started.
+10. `M9` - Not started.
+11. `M10` - Not started.
 
 ---
 
@@ -384,6 +402,7 @@ Risk 4: Host runtime mismatch between `tolang` and GTOS.
 
 ## 7. Immediate Next Actions
 
-1. Start M0 architecture lock and open implementation tracker issues per milestone.
-2. Begin M1 parser skeleton and golden test corpus from `TOL_SPEC.md` examples.
-3. Create `ctmm-conformance` test manifest mapping each required feature to tests.
+1. Finish direct-IR backend for storage slots/mappings/arrays (remove current `TOL3002` path for storage).
+2. Implement typed ABI decode/encode subset needed for external/public entry wrappers.
+3. Expand verifier for control-flow and function-level checks beyond current syntax/shape validation.
+4. Build CTMM conformance manifest and map each missing feature to concrete tests.

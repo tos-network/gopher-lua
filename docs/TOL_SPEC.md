@@ -747,10 +747,8 @@ Implemented:
    `require`, `assert`, `revert "..."`, `emit`, expression statement.
 4. Expression subset works:
    unary/binary ops, calls, member/index access, nested mapping index chains.
-5. Storage lowering in compiler pipeline works for:
-   - plain slots (`u*`/`i*`/`bool`/`address`/`bytes`/`string`)
-   - `mapping(...)` including nested mapping depth checks
-   - storage arrays: `arr.length`, `arr[i]`, `arr[i]=v`, `arr.push(v)`
+5. Canonical compiler route is direct:
+   `TOL typed/lowered -> IR -> bytecode` (no Lua transpile stage).
 6. External/public dispatch wrappers are generated using selector strings:
    default `keccak256("name(type1,type2,...)")[0:4]` in `0x????????` form,
    and `@selector("0x........")` override.
@@ -762,10 +760,8 @@ Implemented:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
 10. `selector("sig")` literal calls are lowered as compile-time selector constants
     (`0x????????`).
-12. Selector member builtins are supported for externally dispatchable functions:
+11. Selector member builtins are supported for externally dispatchable functions:
     `this.fn.selector` and `Contract.fn.selector`.
-11. Canonical backend route is direct:
-    `TOL typed/lowered -> IR -> bytecode` (no Lua transpile stage).
 
 Partially implemented:
 
@@ -774,15 +770,17 @@ Partially implemented:
 2. `error`/`enum`/`modifier` declarations are currently skipped, not enforced.
 3. Constructor parameters are accepted and forwarded by wrapper call only;
    typed ABI decode/binding semantics are not implemented yet.
-4. `continue` semantics are lowered via deterministic labels/goto in loops,
+4. Storage lowering in canonical direct-IR path is not implemented yet
+   (storage currently returns deterministic `TOL3002`).
+5. `continue` semantics are lowered via deterministic labels/goto in loops,
    but still need deeper verifier checks for corner-case control flow.
-5. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
+6. Signed type names (`i*`) are accepted in types/signatures, but full Solidity-like
    signed arithmetic/cast verifier semantics are not yet complete.
-6. `selector("sig")` currently requires a string literal argument in direct IR mode;
+7. `selector("sig")` currently requires a string literal argument in direct IR mode;
    dynamic selector expressions are not implemented.
-7. Selector member builtins currently work only for externally dispatchable
+8. Selector member builtins currently work only for externally dispatchable
    targets in current stage.
-8. `math.binaryLog`/`math.pow2` are implemented; `math.max(xs: i256[])` in spec
+9. `math.binaryLog`/`math.pow2` are implemented; `math.max(xs: i256[])` in spec
    is not implemented as a dedicated array intrinsic.
 
 Not implemented yet (spec gap):
