@@ -126,7 +126,8 @@ Current parser/sema coverage in this branch:
    Public API now also includes deterministic `.toc` artifact packing/unpacking
    (`CompileTOLToTOC` / `EncodeTOC` / `DecodeTOC` / `VerifyTOCSourceHash`) with `TOC\0` magic,
    metadata, ABI/storage JSON payloads, and keccak256 source/bytecode hashes;
-   decode path performs strict integrity checks before returning artifact data.
+   decode path performs strict integrity checks (including metadata JSON validity)
+   before returning artifact data.
    Storage lowering in this direct-IR path now supports deterministic subset
    operations (scalar/mapping/array core access), while canonical slot hashing
    and persistent host-backed storage semantics remain to be completed.

@@ -213,6 +213,12 @@ func DecodeTOC(data []byte) (*TOCArtifact, error) {
 	if _, err := DecodeFunctionProto(bytecode); err != nil {
 		return nil, fmt.Errorf("toc embedded bytecode decode failed: %w", err)
 	}
+	if len(abiJSON) > 0 && !json.Valid(abiJSON) {
+		return nil, fmt.Errorf("toc abi payload is not valid json")
+	}
+	if len(storageJSON) > 0 && !json.Valid(storageJSON) {
+		return nil, fmt.Errorf("toc storage payload is not valid json")
+	}
 	return &TOCArtifact{
 		Version:           version,
 		Compiler:          compiler,

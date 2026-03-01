@@ -823,7 +823,7 @@ Implemented:
     deterministic `TOC\0` container with compiler/contract metadata,
     raw bytecode payload, ABI/storage JSON payloads, and keccak256
     source/bytecode hashes (`DecodeTOC` verifies version, embedded bytecode hash,
-    and bytecode decodability).
+    bytecode decodability, and ABI/storage JSON validity).
 
 Partially implemented:
 

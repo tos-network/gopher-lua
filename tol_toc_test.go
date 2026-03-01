@@ -300,3 +300,87 @@ contract Demo {
 		t.Fatalf("expected source hash mismatch")
 	}
 }
+
+func TestDecodeTOCRejectsInvalidABIJSON(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	bytecode, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	var raw bytes.Buffer
+	raw.Write(tocMagic[:])
+	if err := writeU16(&raw, TOCFormatVersion); err != nil {
+		t.Fatalf("write version: %v", err)
+	}
+	if err := writeString(&raw, "tolang/"+PackageVersion); err != nil {
+		t.Fatalf("write compiler: %v", err)
+	}
+	if err := writeString(&raw, "Demo"); err != nil {
+		t.Fatalf("write contract: %v", err)
+	}
+	if err := writeLenBytes(&raw, bytecode); err != nil {
+		t.Fatalf("write bytecode: %v", err)
+	}
+	if err := writeLenBytes(&raw, []byte("{")); err != nil {
+		t.Fatalf("write abi: %v", err)
+	}
+	if err := writeLenBytes(&raw, []byte("{}")); err != nil {
+		t.Fatalf("write storage: %v", err)
+	}
+	if _, err := raw.Write(make([]byte, 32)); err != nil {
+		t.Fatalf("write source hash: %v", err)
+	}
+	if _, err := raw.Write(keccak256Bytes(bytecode)); err != nil {
+		t.Fatalf("write bytecode hash: %v", err)
+	}
+	if _, err := DecodeTOC(raw.Bytes()); err == nil {
+		t.Fatalf("expected invalid abi json error")
+	}
+}
+
+func TestDecodeTOCRejectsInvalidStorageJSON(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	bytecode, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	var raw bytes.Buffer
+	raw.Write(tocMagic[:])
+	if err := writeU16(&raw, TOCFormatVersion); err != nil {
+		t.Fatalf("write version: %v", err)
+	}
+	if err := writeString(&raw, "tolang/"+PackageVersion); err != nil {
+		t.Fatalf("write compiler: %v", err)
+	}
+	if err := writeString(&raw, "Demo"); err != nil {
+		t.Fatalf("write contract: %v", err)
+	}
+	if err := writeLenBytes(&raw, bytecode); err != nil {
+		t.Fatalf("write bytecode: %v", err)
+	}
+	if err := writeLenBytes(&raw, []byte("{}")); err != nil {
+		t.Fatalf("write abi: %v", err)
+	}
+	if err := writeLenBytes(&raw, []byte("{")); err != nil {
+		t.Fatalf("write storage: %v", err)
+	}
+	if _, err := raw.Write(make([]byte, 32)); err != nil {
+		t.Fatalf("write source hash: %v", err)
+	}
+	if _, err := raw.Write(keccak256Bytes(bytecode)); err != nil {
+		t.Fatalf("write bytecode hash: %v", err)
+	}
+	if _, err := DecodeTOC(raw.Bytes()); err == nil {
+		t.Fatalf("expected invalid storage json error")
+	}
+}

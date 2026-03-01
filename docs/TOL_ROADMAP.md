@@ -63,7 +63,8 @@ Recent verifier hardening completed in this phase:
    - optional source-hash check path `tolang -vtoc -vtocsrc <source.tol> <artifact.toc>`
    - source/bytecode keccak256 hash embedding and roundtrip tests
    - decode-time strict validation (version/contract/bytecode presence,
-     bytecode-hash integrity, embedded bytecode decodability)
+     bytecode-hash integrity, embedded bytecode decodability,
+     ABI/storage JSON validity)
 
 ---
 
