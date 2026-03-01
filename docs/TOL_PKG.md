@@ -32,6 +32,7 @@ tolang -dtoc artifact.toc
 tolang -dtocj artifact.toc
 tolang -vtoc artifact.toc
 tolang -vtoc -vtocsrc source.tol artifact.toc
+tolang -vtoi interface.toi
 tolang -ctor out.tor <dir_or_file.tol>
 tolang -ctorpkg name -ctorver 1.0.0 -ctorsrc -ctor out.tor input.tol
 tolang -dtor artifact.tor
@@ -643,6 +644,7 @@ tol test --fuzz fuzz_transfer --fuzz-time 30s
 | `tolang -dtocj artifact.toc` | `tol inspect --json artifact.toc` |
 | `tolang -vtoc artifact.toc` | `tol verify artifact.toc` |
 | `tolang -vtoc -vtocsrc src.tol artifact.toc` | `tol verify --source src.tol artifact.toc` |
+| `tolang -vtoi interface.toi` | `tol verify interface.toi` |
 | `tolang -dtor artifact.tor` | `tol inspect artifact.tor` |
 | `tolang -dtorj artifact.tor` | `tol inspect --json artifact.tor` |
 | `tolang -vtor artifact.tor` | `tol verify artifact.tor` |

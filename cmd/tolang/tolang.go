@@ -24,7 +24,7 @@ func main() {
 
 func mainAux() int {
 	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_ctorsrc bool
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_vtoi, opt_ctorsrc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
@@ -50,6 +50,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_dtor, "dtor", false, "")
 	flag.BoolVar(&opt_dtorj, "dtorj", false, "")
 	flag.BoolVar(&opt_vtor, "vtor", false, "")
+	flag.BoolVar(&opt_vtoi, "vtoi", false, "")
 	flag.BoolVar(&opt_ctorsrc, "ctorsrc", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: tolang [options] [script [args]].
@@ -77,6 +78,7 @@ func mainAux() int {
 	  -vtoc    validate TOC artifact and return status
 	  -vtocsrc file  optional source file to verify TOC source_hash (use with -vtoc)
 	  -vtor    validate TOR artifact and return status
+	  -vtoi    validate TOI text and return status
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -142,8 +144,8 @@ func mainAux() int {
 		fmt.Println("cannot use -vtor with -dtor/-dtorj together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoi, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, or -vtor")
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoi) > 0 || len(opt_ctoc) > 0 || len(opt_ctor) > 0 || opt_dtol || opt_dtoc || opt_dtocj || opt_vtoc || opt_dtor || opt_dtorj || opt_vtor || opt_vtoi) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoi, -ctoc, -ctor, -dtol, -dtoc, -dtocj, -vtoc, -dtor, -dtorj, -vtor, or -vtoi")
 		return 1
 	}
 
@@ -472,6 +474,14 @@ func mainAux() int {
 					return 1
 				}
 				fmt.Println("TOR: ok")
+				return 0
+			}
+			if opt_vtoi {
+				if err := lua.ValidateTOIText(src); err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Println("TOI: ok")
 				return 0
 			}
 			if opt_dt || opt_dc || opt_di {
