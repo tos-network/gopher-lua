@@ -758,9 +758,9 @@ Implemented:
 7. Constructor hook works and forwards runtime args via `tos.oncreate(...)`.
 8. Toolchain exists:
    - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOC`,
-     `EncodeTOC`, `DecodeTOC`
+     `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`
    - CLI: `tolang -ctol`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
-     `tolang -dtocj`, and `tolang -vtoc`
+     `tolang -dtocj`, `tolang -vtoc`, and `tolang -vtoc -vtocsrc <source.tol>`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
 10. `selector("sig")` literal calls are lowered as compile-time selector constants

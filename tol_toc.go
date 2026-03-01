@@ -225,6 +225,19 @@ func DecodeTOC(data []byte) (*TOCArtifact, error) {
 	}, nil
 }
 
+// VerifyTOCSourceHash checks whether a decoded TOC artifact matches the given source bytes.
+func VerifyTOCSourceHash(toc *TOCArtifact, source []byte) error {
+	if toc == nil {
+		return fmt.Errorf("nil toc artifact")
+	}
+	want := keccak256Hex(source)
+	got := strings.ToLower(strings.TrimSpace(toc.SourceHash))
+	if got != want {
+		return fmt.Errorf("toc source hash mismatch: got=%s want=%s", toc.SourceHash, want)
+	}
+	return nil
+}
+
 func buildTOCMetadata(mod *tolast.Module) (string, []byte, []byte, error) {
 	if mod == nil || mod.Contract == nil {
 		return "", nil, nil, fmt.Errorf("toc metadata requires a contract module")

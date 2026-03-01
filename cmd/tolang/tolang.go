@@ -19,7 +19,7 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc string
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc, opt_vtocsrc string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
@@ -27,6 +27,7 @@ func mainAux() int {
 	flag.StringVar(&opt_c, "c", "", "")
 	flag.StringVar(&opt_ctol, "ctol", "", "")
 	flag.StringVar(&opt_ctoc, "ctoc", "", "")
+	flag.StringVar(&opt_vtocsrc, "vtocsrc", "", "")
 	flag.BoolVar(&opt_i, "i", false, "")
 	flag.BoolVar(&opt_v, "v", false, "")
 	flag.BoolVar(&opt_dt, "dt", false, "")
@@ -53,6 +54,7 @@ func mainAux() int {
 	  -dtoc    dump parsed TOC artifact metadata
 	  -dtocj   dump parsed TOC artifact metadata as JSON
 	  -vtoc    validate TOC artifact and return status
+	  -vtocsrc file  optional source file to verify TOC source_hash (use with -vtoc)
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -76,6 +78,10 @@ func mainAux() int {
 	}
 	if len(opt_ctol) > 0 && len(opt_ctoc) > 0 {
 		fmt.Println("cannot use -ctol and -ctoc together")
+		return 1
+	}
+	if len(opt_vtocsrc) > 0 && !opt_vtoc {
+		fmt.Println("-vtocsrc requires -vtoc")
 		return 1
 	}
 	if opt_dtoc && opt_vtoc {
@@ -264,9 +270,21 @@ func mainAux() int {
 				return 0
 			}
 			if opt_vtoc {
-				if _, err := lua.DecodeTOC(src); err != nil {
+				toc, err := lua.DecodeTOC(src)
+				if err != nil {
 					fmt.Println(err.Error())
 					return 1
+				}
+				if len(opt_vtocsrc) > 0 {
+					source, err := os.ReadFile(opt_vtocsrc)
+					if err != nil {
+						fmt.Println(err.Error())
+						return 1
+					}
+					if err := lua.VerifyTOCSourceHash(toc, source); err != nil {
+						fmt.Println(err.Error())
+						return 1
+					}
 				}
 				fmt.Println("TOC: ok")
 				return 0

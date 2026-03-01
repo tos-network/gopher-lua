@@ -260,3 +260,43 @@ func TestDecodeTOCRejectsEmptyBytecodePayload(t *testing.T) {
 		t.Fatalf("expected empty bytecode error")
 	}
 }
+
+func TestVerifyTOCSourceHashMatches(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	tocBytes, err := CompileTOLToTOC(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected toc compile error: %v", err)
+	}
+	toc, err := DecodeTOC(tocBytes)
+	if err != nil {
+		t.Fatalf("unexpected toc decode error: %v", err)
+	}
+	if err := VerifyTOCSourceHash(toc, src); err != nil {
+		t.Fatalf("unexpected source hash mismatch: %v", err)
+	}
+}
+
+func TestVerifyTOCSourceHashMismatch(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	tocBytes, err := CompileTOLToTOC(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected toc compile error: %v", err)
+	}
+	toc, err := DecodeTOC(tocBytes)
+	if err != nil {
+		t.Fatalf("unexpected toc decode error: %v", err)
+	}
+	if err := VerifyTOCSourceHash(toc, []byte("other source")); err == nil {
+		t.Fatalf("expected source hash mismatch")
+	}
+}

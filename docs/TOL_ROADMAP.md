@@ -60,6 +60,7 @@ Recent verifier hardening completed in this phase:
    - CLI metadata dump path `tolang -dtoc <artifact.toc>` (with embedded bytecode decode check)
    - CLI JSON metadata dump path `tolang -dtocj <artifact.toc>`
    - CLI strict validation path `tolang -vtoc <artifact.toc>` (status-only check)
+   - optional source-hash check path `tolang -vtoc -vtocsrc <source.tol> <artifact.toc>`
    - source/bytecode keccak256 hash embedding and roundtrip tests
    - decode-time strict validation (version/contract/bytecode presence,
      bytecode-hash integrity, embedded bytecode decodability)
