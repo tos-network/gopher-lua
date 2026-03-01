@@ -128,6 +128,9 @@ Current parser/sema coverage in this branch:
    metadata, ABI/storage JSON payloads, and keccak256 source/bytecode hashes;
    decode path performs strict integrity checks (including metadata JSON validity)
    before returning artifact data.
+   Packaging API now also includes deterministic `.tor` archive pack/unpack
+   (`EncodeTOR` / `DecodeTOR` / `TORPackageHash`) with canonical entry ordering
+   and safe-path validation.
    Storage lowering in this direct-IR path now supports deterministic subset
    operations (scalar/mapping/array core access), while canonical slot hashing
    and persistent host-backed storage semantics remain to be completed.

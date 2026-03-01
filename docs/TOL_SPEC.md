@@ -758,7 +758,8 @@ Implemented:
 7. Constructor hook works and forwards runtime args via `tos.oncreate(...)`.
 8. Toolchain exists:
    - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOC`,
-     `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`
+     `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`,
+     `EncodeTOR`, `DecodeTOR`, `TORPackageHash`
    - CLI: `tolang -ctol`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
      `tolang -dtocj`, `tolang -vtoc`, and `tolang -vtoc -vtocsrc <source.tol>`
 9. Deterministic integer intrinsics available in runtime math lib:
@@ -824,6 +825,10 @@ Implemented:
     raw bytecode payload, ABI/storage JSON payloads, and keccak256
     source/bytecode hashes (`DecodeTOC` verifies version, embedded bytecode hash,
     bytecode decodability, and ABI/storage JSON validity).
+32. `.tor` archive baseline is available in API form:
+    deterministic ZIP(`store`) encoding with canonical ordering
+    (`manifest.json` first, then lexicographically sorted entries),
+    path-safety validation, manifest JSON validation, and package hash helper.
 
 Partially implemented:
 

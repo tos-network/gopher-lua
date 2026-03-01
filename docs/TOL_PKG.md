@@ -14,6 +14,7 @@ Currently landed in `tolang`:
   - `CompileTOLToTOC(source, name)` -> compile `.tol` to deterministic `.toc`
   - `EncodeTOC(...)` / `DecodeTOC(...)`
   - `VerifyTOCSourceHash(toc, sourceBytes)`
+  - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
 - CLI:
   - `tolang -ctoc out.toc input.tol`
   - `tolang -dtoc artifact.toc`
@@ -24,7 +25,7 @@ Currently landed in `tolang`:
 Not landed yet:
 
 - `.toi` compile/import flow
-- `.tor` archive format + tooling
+- `.tor` CLI tooling (`-ctor`, `-dtor`) and high-level manifest builder
 - registry resolution (`tor://...`, `toc://...`)
 
 ---

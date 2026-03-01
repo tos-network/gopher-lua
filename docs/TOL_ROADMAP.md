@@ -65,6 +65,8 @@ Recent verifier hardening completed in this phase:
    - decode-time strict validation (version/contract/bytecode presence,
      bytecode-hash integrity, embedded bytecode decodability,
      ABI/storage JSON validity)
+   - deterministic `.tor` archive API (`EncodeTOR`/`DecodeTOR`/`TORPackageHash`)
+     with canonical ordering and manifest/path validation
 
 ---
 
