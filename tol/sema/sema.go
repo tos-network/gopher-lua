@@ -184,10 +184,10 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
 			checkDuplicateLocals(filename, "function", fn.Name, fn.Params, fn.Body, &diags)
-			if len(fn.Returns) > 0 && !containsReturnValueStmt(fn.Body) {
+			if len(fn.Returns) > 0 && !guaranteesValueReturnOrRevert(fn.Body) {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidReturn,
-					Message: fmt.Sprintf("function '%s' requires at least one return statement with value in current verifier stage", fn.Name),
+					Message: fmt.Sprintf("function '%s' requires all paths to end in return value or revert in current verifier stage", fn.Name),
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -583,19 +583,29 @@ func checkReturnStatements(filename, ownerKind, ownerName string, expectsValue b
 	}
 }
 
-func containsReturnValueStmt(stmts []ast.Statement) bool {
+func guaranteesValueReturnOrRevert(stmts []ast.Statement) bool {
 	for _, s := range stmts {
-		if s.Kind == "return" && s.Expr != nil {
-			return true
-		}
-		if s.Init != nil && containsReturnValueStmt([]ast.Statement{*s.Init}) {
-			return true
-		}
-		if containsReturnValueStmt(s.Then) || containsReturnValueStmt(s.Else) || containsReturnValueStmt(s.Body) {
+		if guaranteesValueReturnOrRevertStmt(s) {
 			return true
 		}
 	}
 	return false
+}
+
+func guaranteesValueReturnOrRevertStmt(s ast.Statement) bool {
+	switch s.Kind {
+	case "return":
+		return s.Expr != nil
+	case "revert":
+		return true
+	case "if":
+		if len(s.Then) == 0 || len(s.Else) == 0 {
+			return false
+		}
+		return guaranteesValueReturnOrRevert(s.Then) && guaranteesValueReturnOrRevert(s.Else)
+	default:
+		return false
+	}
 }
 
 type localScope struct {

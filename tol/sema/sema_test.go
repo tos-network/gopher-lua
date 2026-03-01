@@ -782,6 +782,78 @@ func TestCheckRejectsNonVoidFunctionWithoutAnyReturnStmt(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsNonVoidFunctionMissingReturnOnSomePath(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Returns: []ast.FieldDecl{
+						{Name: "ok", Type: "bool"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "if",
+							Cond: &ast.Expr{Kind: "binary", Op: ">", Left: &ast.Expr{Kind: "ident", Value: "x"}, Right: &ast.Expr{Kind: "number", Value: "0"}},
+							Then: []ast.Statement{
+								{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2017") {
+		t.Fatalf("expected TOL2017, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsNonVoidFunctionAllPathsReturnOrRevert(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Params: []ast.FieldDecl{
+						{Name: "x", Type: "u256"},
+					},
+					Returns: []ast.FieldDecl{
+						{Name: "ok", Type: "bool"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "if",
+							Cond: &ast.Expr{Kind: "binary", Op: ">", Left: &ast.Expr{Kind: "ident", Value: "x"}, Right: &ast.Expr{Kind: "number", Value: "0"}},
+							Then: []ast.Statement{
+								{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+							},
+							Else: []ast.Statement{
+								{Kind: "revert", Expr: &ast.Expr{Kind: "string", Value: "\"NO\""}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsConstructorReturnValue(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

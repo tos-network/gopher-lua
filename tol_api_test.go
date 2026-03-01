@@ -424,6 +424,26 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsNonVoidFunctionMissingReturnPath(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn f(x: u256) -> (out: u256) public {
+    if x > 0 {
+      return 1;
+    }
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected non-void return-path error")
+	}
+	if !strings.Contains(err.Error(), "TOL2017") {
+		t.Fatalf("expected TOL2017 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
 	src := []byte(`
 tol 0.2

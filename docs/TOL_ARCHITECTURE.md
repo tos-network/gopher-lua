@@ -76,7 +76,8 @@ Current parser/sema coverage in this branch:
    contract-local function call arity checks, assignment-expression target checks,
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    assignment-expression placement checks (value-context rejection),
-   non-void function value-return presence checks (current conservative rule),
+   non-void function return-path checks for current structured subset
+   (all paths must value-return or `revert`; loops still conservative),
    statement-shape checks for current subset (`require/assert` payload, `emit` identifier-call payload),
    expression-only builtin statement rejection (`selector(...)` standalone/post usage),
    `revert` payload shape checks (empty or string literal in current stage),
