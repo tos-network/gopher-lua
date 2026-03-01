@@ -315,6 +315,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsUnknownContractMemberFunctionCallTarget(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    Demo.missing();
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unknown call target error")
+	}
+	if !strings.Contains(err.Error(), "TOL2031") {
+		t.Fatalf("expected TOL2031 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsThisMemberCallToNonExternalFunction(t *testing.T) {
 	src := []byte(`
 tol 0.2
@@ -352,6 +371,26 @@ contract Demo {
 	}
 	if !strings.Contains(err.Error(), "TOL2032") {
 		t.Fatalf("expected TOL2032 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsContractMemberFunctionCallArityMismatch(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn sum(a: u256, b: u256) public { return; }
+  fn run() public {
+    Demo.sum(1);
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected arity error")
+	}
+	if !strings.Contains(err.Error(), "TOL2019") {
+		t.Fatalf("expected TOL2019 sema error, got: %v", err)
 	}
 }
 
