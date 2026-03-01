@@ -19,7 +19,7 @@ func main() {
 
 func mainAux() int {
 	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoc string
-	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc bool
+	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_vtoc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
 	flag.StringVar(&opt_p, "p", "", "")
@@ -34,6 +34,7 @@ func mainAux() int {
 	flag.BoolVar(&opt_bc, "bc", false, "")
 	flag.BoolVar(&opt_dtol, "dtol", false, "")
 	flag.BoolVar(&opt_dtoc, "dtoc", false, "")
+	flag.BoolVar(&opt_vtoc, "vtoc", false, "")
 	flag.Usage = func() {
 		fmt.Println(`Usage: tolang [options] [script [args]].
 	Available options are:
@@ -48,6 +49,7 @@ func mainAux() int {
 	  -di      dump IR
 	  -dtol    dump parsed TOL module
 	  -dtoc    dump parsed TOC artifact metadata
+	  -vtoc    validate TOC artifact and return status
 	  -i       enter interactive mode after executing 'script'
   -p file  write cpu profiles to the file
   -v       show version information`)
@@ -73,8 +75,12 @@ func mainAux() int {
 		fmt.Println("cannot use -ctol and -ctoc together")
 		return 1
 	}
-	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || opt_dtol || opt_dtoc) {
-		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -dtol, or -dtoc")
+	if opt_dtoc && opt_vtoc {
+		fmt.Println("cannot use -dtoc and -vtoc together")
+		return 1
+	}
+	if opt_bc && (len(opt_ctol) > 0 || len(opt_ctoc) > 0 || opt_dtol || opt_dtoc || opt_vtoc) {
+		fmt.Println("-bc cannot be combined with -ctol, -ctoc, -dtol, -dtoc, or -vtoc")
 		return 1
 	}
 
@@ -207,6 +213,14 @@ func mainAux() int {
 				if len(toc.StorageLayoutJSON) > 0 {
 					fmt.Printf("Storage JSON: %s\n", string(toc.StorageLayoutJSON))
 				}
+				return 0
+			}
+			if opt_vtoc {
+				if _, err := lua.DecodeTOC(src); err != nil {
+					fmt.Println(err.Error())
+					return 1
+				}
+				fmt.Println("TOC: ok")
 				return 0
 			}
 			if opt_dt || opt_dc || opt_di {
