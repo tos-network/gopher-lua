@@ -6,7 +6,8 @@ build:
 tol: *.go pm/*.go cmd/tolang/*.go
 	./_tools/go-inline *.go && go fmt . && go build -o tol ./cmd/tolang
 
-tolang: tol
+tolang: *.go pm/*.go cmd/tolang/*.go
+	./_tools/go-inline *.go && go fmt . && go build -o tolang ./cmd/tolang
 
 test:
 	./_tools/go-inline *.go && go fmt . &&  go test
