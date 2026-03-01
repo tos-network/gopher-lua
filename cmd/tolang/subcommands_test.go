@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -80,5 +81,107 @@ func TestCmdVerifyTOCSourceMismatchExitCode(t *testing.T) {
 
 	if code := cmdVerify([]string{"--source", mismatchPath, tocPath}); code != 2 {
 		t.Fatalf("verify mismatch exit code: got=%d want=2", code)
+	}
+}
+
+func TestCmdCompileTOCWithABISidecar(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "sample.tol")
+	if err := os.WriteFile(input, []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	out := filepath.Join(dir, "out.toc")
+	if code := cmdCompile([]string{"--abi", "-o", out, input}); code != 0 {
+		t.Fatalf("compile with --abi exit code: got=%d want=0", code)
+	}
+	if _, err := os.Stat(out); err != nil {
+		t.Fatalf("toc output missing: %v", err)
+	}
+	abiPath := filepath.Join(dir, "out.abi.json")
+	abi, err := os.ReadFile(abiPath)
+	if err != nil {
+		t.Fatalf("abi sidecar missing: %v", err)
+	}
+	if !json.Valid(abi) {
+		t.Fatalf("abi sidecar must be valid json: %s", string(abi))
+	}
+}
+
+func TestCmdCompileTOINameOverride(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "sample.tol")
+	if err := os.WriteFile(input, []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	out := filepath.Join(dir, "iface.toi")
+	if code := cmdCompile([]string{"--emit", "toi", "--name", "ISampleX", "-o", out, input}); code != 0 {
+		t.Fatalf("compile toi exit code: got=%d want=0", code)
+	}
+	body, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read toi output: %v", err)
+	}
+	info, err := lua.InspectTOIText(body)
+	if err != nil {
+		t.Fatalf("inspect toi: %v", err)
+	}
+	if info.InterfaceName != "ISampleX" {
+		t.Fatalf("toi name override: got=%q want=%q", info.InterfaceName, "ISampleX")
+	}
+}
+
+func TestCmdCompileTORDefaultsAndNameOverride(t *testing.T) {
+	dir := t.TempDir()
+	input := filepath.Join(dir, "my_contract.tol")
+	if err := os.WriteFile(input, []byte("tol 0.2\n\ncontract Sample {\n  fn ping() public {\n  }\n}\n"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	out := filepath.Join(dir, "out.tor")
+	if code := cmdCompile([]string{"--emit", "tor", "--name", "ISampleZ", "-o", out, input}); code != 0 {
+		t.Fatalf("compile tor exit code: got=%d want=0", code)
+	}
+	body, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("read tor output: %v", err)
+	}
+	tor, err := lua.DecodeTOR(body)
+	if err != nil {
+		t.Fatalf("decode tor: %v", err)
+	}
+
+	var manifest struct {
+		Name      string `json:"name"`
+		Version   string `json:"version"`
+		Contracts []struct {
+			Name string `json:"name"`
+			TOI  string `json:"toi"`
+		} `json:"contracts"`
+	}
+	if err := json.Unmarshal(tor.ManifestJSON, &manifest); err != nil {
+		t.Fatalf("decode manifest json: %v", err)
+	}
+	if manifest.Name != "my_contract" {
+		t.Fatalf("default tor package name: got=%q want=%q", manifest.Name, "my_contract")
+	}
+	if manifest.Version != "0.0.0" {
+		t.Fatalf("default tor package version: got=%q want=%q", manifest.Version, "0.0.0")
+	}
+	if len(manifest.Contracts) != 1 {
+		t.Fatalf("manifest contracts len: got=%d want=1", len(manifest.Contracts))
+	}
+	toiPath := manifest.Contracts[0].TOI
+	toiBody, ok := tor.Files[toiPath]
+	if !ok {
+		t.Fatalf("manifest toi path %q missing from archive files", toiPath)
+	}
+	info, err := lua.InspectTOIText(toiBody)
+	if err != nil {
+		t.Fatalf("inspect tor toi: %v", err)
+	}
+	if info.InterfaceName != "ISampleZ" {
+		t.Fatalf("tor toi name override: got=%q want=%q", info.InterfaceName, "ISampleZ")
 	}
 }

@@ -128,27 +128,8 @@ func renderTOIField(name, typ, fallbackName string) string {
 
 // ValidateTOIText performs a lightweight structural validation for textual .toi content.
 func ValidateTOIText(data []byte) error {
-	s := strings.TrimSpace(string(data))
-	if s == "" {
-		return fmt.Errorf("toi text is empty")
-	}
-	lines := strings.Split(s, "\n")
-	if len(lines) == 0 {
-		return fmt.Errorf("toi text is empty")
-	}
-	first := strings.TrimSpace(lines[0])
-	if !strings.HasPrefix(first, "tol ") {
-		return fmt.Errorf("toi text must start with 'tol <version>' header")
-	}
-	if !strings.Contains(s, "interface ") {
-		return fmt.Errorf("toi text must contain interface declaration")
-	}
-	open := strings.Count(s, "{")
-	close := strings.Count(s, "}")
-	if open == 0 || close == 0 || open != close {
-		return fmt.Errorf("toi text has unbalanced braces")
-	}
-	return nil
+	_, err := parseTOIInfo(data)
+	return err
 }
 
 // TOIInfo is lightweight metadata extracted from textual .toi content.
@@ -161,38 +142,132 @@ type TOIInfo struct {
 
 // InspectTOIText validates and extracts lightweight metadata from textual .toi content.
 func InspectTOIText(data []byte) (*TOIInfo, error) {
-	if err := ValidateTOIText(data); err != nil {
-		return nil, err
-	}
+	return parseTOIInfo(data)
+}
+
+func parseTOIInfo(data []byte) (*TOIInfo, error) {
 	s := strings.TrimSpace(string(data))
+	if s == "" {
+		return nil, fmt.Errorf("toi text is empty")
+	}
 	lines := strings.Split(s, "\n")
 	if len(lines) == 0 {
 		return nil, fmt.Errorf("toi text is empty")
 	}
-	first := strings.TrimSpace(lines[0])
+
+	first := ""
+	start := 0
+	for i, raw := range lines {
+		line := normalizeTOILine(raw)
+		if line == "" {
+			continue
+		}
+		first = line
+		start = i + 1
+		break
+	}
+	if first == "" {
+		return nil, fmt.Errorf("toi text is empty")
+	}
+	if !strings.HasPrefix(first, "tol ") {
+		return nil, fmt.Errorf("toi text must start with 'tol <version>' header")
+	}
 	version := strings.TrimSpace(strings.TrimPrefix(first, "tol "))
 	if version == "" {
 		return nil, fmt.Errorf("toi header missing version")
 	}
 
 	info := &TOIInfo{Version: version}
-	for _, raw := range lines {
-		line := strings.TrimSpace(raw)
-		switch {
-		case strings.HasPrefix(line, "interface "):
-			name := strings.TrimSpace(strings.TrimPrefix(line, "interface "))
-			if idx := strings.Index(name, "{"); idx >= 0 {
-				name = strings.TrimSpace(name[:idx])
+	seenInterface := false
+	inInterface := false
+	selectorPending := false
+
+	for i := start; i < len(lines); i++ {
+		line := normalizeTOILine(lines[i])
+		if line == "" {
+			continue
+		}
+		if !seenInterface {
+			if !strings.HasPrefix(line, "interface ") {
+				return nil, fmt.Errorf("toi text must contain interface declaration")
+			}
+			nameAndBrace := strings.TrimSpace(strings.TrimPrefix(line, "interface "))
+			if !strings.HasSuffix(nameAndBrace, "{") {
+				return nil, fmt.Errorf("toi interface declaration must end with '{'")
+			}
+			name := strings.TrimSpace(strings.TrimSuffix(nameAndBrace, "{"))
+			if name == "" {
+				return nil, fmt.Errorf("toi interface name not found")
 			}
 			info.InterfaceName = name
-		case strings.HasPrefix(line, "fn "):
-			info.FunctionCount++
-		case strings.HasPrefix(line, "event "):
-			info.EventCount++
+			seenInterface = true
+			inInterface = true
+			continue
 		}
+		if !inInterface {
+			return nil, fmt.Errorf("toi text has unexpected content after interface block")
+		}
+
+		if line == "}" {
+			inInterface = false
+			continue
+		}
+		if strings.HasPrefix(line, "interface ") {
+			return nil, fmt.Errorf("toi text supports exactly one interface declaration")
+		}
+		if strings.HasPrefix(line, "@selector(") {
+			if !strings.HasSuffix(line, ")") {
+				return nil, fmt.Errorf("toi selector annotation must end with ')'")
+			}
+			selectorPending = true
+			continue
+		}
+		if strings.HasPrefix(line, "fn ") {
+			if !strings.HasSuffix(line, ";") {
+				return nil, fmt.Errorf("toi function declaration must end with ';'")
+			}
+			if !strings.Contains(line, "(") || !strings.Contains(line, ")") {
+				return nil, fmt.Errorf("toi function declaration must contain parameter list")
+			}
+			info.FunctionCount++
+			selectorPending = false
+			continue
+		}
+		if strings.HasPrefix(line, "event ") {
+			if selectorPending {
+				return nil, fmt.Errorf("toi selector annotation must be followed by function declaration")
+			}
+			if !strings.HasSuffix(line, ";") {
+				return nil, fmt.Errorf("toi event declaration must end with ';'")
+			}
+			if !strings.Contains(line, "(") || !strings.Contains(line, ")") {
+				return nil, fmt.Errorf("toi event declaration must contain parameter list")
+			}
+			info.EventCount++
+			continue
+		}
+		return nil, fmt.Errorf("toi interface block contains unsupported line: %q", line)
 	}
-	if info.InterfaceName == "" {
-		return nil, fmt.Errorf("toi interface name not found")
+
+	if !seenInterface {
+		return nil, fmt.Errorf("toi text must contain interface declaration")
+	}
+	if inInterface {
+		return nil, fmt.Errorf("toi text has unbalanced braces")
+	}
+	if selectorPending {
+		return nil, fmt.Errorf("toi selector annotation must be followed by function declaration")
 	}
 	return info, nil
+}
+
+func normalizeTOILine(raw string) string {
+	line := strings.TrimSpace(raw)
+	if line == "" {
+		return ""
+	}
+	if idx := strings.Index(line, "--"); idx >= 0 {
+		line = strings.TrimSpace(line[:idx])
+	}
+	return line
 }

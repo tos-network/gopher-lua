@@ -117,6 +117,65 @@ func TestValidateTOITextRejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestValidateTOITextRejectsMissingSemicolon(t *testing.T) {
+	toi := []byte(`
+tol 0.2
+
+interface ISample {
+  fn ping() public
+}
+`)
+	if err := ValidateTOIText(toi); err == nil {
+		t.Fatalf("expected missing semicolon error")
+	}
+}
+
+func TestValidateTOITextRejectsDanglingSelector(t *testing.T) {
+	toi := []byte(`
+tol 0.2
+
+interface ISample {
+  @selector("0x12345678")
+  event Tick(v: u256);
+}
+`)
+	if err := ValidateTOIText(toi); err == nil {
+		t.Fatalf("expected dangling selector error")
+	}
+}
+
+func TestValidateTOITextRejectsMultipleInterfaces(t *testing.T) {
+	toi := []byte(`
+tol 0.2
+
+interface IA {
+  fn a() public;
+}
+
+interface IB {
+  fn b() public;
+}
+`)
+	if err := ValidateTOIText(toi); err == nil {
+		t.Fatalf("expected multiple interface error")
+	}
+}
+
+func TestValidateTOITextAcceptsComments(t *testing.T) {
+	toi := []byte(`
+-- file comment
+tol 0.2
+
+interface ISample { -- inline
+  fn ping() public; -- fn
+  event Tick(v: u256); -- event
+}
+`)
+	if err := ValidateTOIText(toi); err != nil {
+		t.Fatalf("expected comments to be accepted: %v", err)
+	}
+}
+
 func TestInspectTOIText(t *testing.T) {
 	src := []byte(`
 tol 0.2
