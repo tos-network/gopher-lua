@@ -67,11 +67,14 @@ Current parser/sema coverage in this branch:
    names (no overload yet), break/continue loop-context validation,
    `set` target assignability checks,
    function modifier validation (unsupported/conflicting combinations),
+   constructor modifier validation (supported subset + conflict checks),
    duplicate parameter-name checks, return-value shape checks
    (void/non-void/constructor/fallback),
    storage-access shape checks for implemented subset
    (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints),
    contract-local function call arity checks, assignment-expression target checks,
+   assignment-expression placement checks (value-context rejection),
+   non-void function value-return presence checks (current conservative rule),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target

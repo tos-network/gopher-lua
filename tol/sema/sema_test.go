@@ -448,6 +448,60 @@ func TestCheckRejectsDuplicateConstructorParams(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsUnknownConstructorModifier(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Constructor: &ast.ConstructorDecl{
+				Modifiers: []string{"onlyOwner"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2014") {
+		t.Fatalf("expected TOL2014, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsConflictingConstructorVisibility(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Constructor: &ast.ConstructorDecl{
+				Modifiers: []string{"public", "internal"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2015") {
+		t.Fatalf("expected TOL2015, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsConstructorPayableModifier(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Constructor: &ast.ConstructorDecl{
+				Modifiers: []string{"payable"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsReturnValueInVoidFunction(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -488,6 +542,38 @@ func TestCheckRejectsMissingReturnValueInNonVoidFunction(t *testing.T) {
 					},
 					Body: []ast.Statement{
 						{Kind: "return"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2017") {
+		t.Fatalf("expected TOL2017, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsNonVoidFunctionWithoutAnyReturnStmt(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Returns: []ast.FieldDecl{
+						{Name: "ok", Type: "bool"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "let",
+							Name: "x",
+							Type: "u256",
+							Expr: &ast.Expr{Kind: "number", Value: "1"},
+						},
 					},
 				},
 			},
@@ -833,5 +919,278 @@ func TestCheckRejectsInvalidAssignmentExprTarget(t *testing.T) {
 	}
 	if !strings.Contains(diags.Error(), "TOL2008") {
 		t.Fatalf("expected TOL2008, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsAssignExprInLetInitializer(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "let",
+							Name: "x",
+							Type: "u256",
+							Expr: &ast.Expr{
+								Kind: "assign",
+								Op:   "=",
+								Left: &ast.Expr{Kind: "ident", Value: "a"},
+								Right: &ast.Expr{
+									Kind:  "number",
+									Value: "1",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsNonCallAssignExprStatement(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind:  "binary",
+								Op:    "+",
+								Left:  &ast.Expr{Kind: "number", Value: "1"},
+								Right: &ast.Expr{Kind: "number", Value: "2"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsForPostNonCallAssignExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "for",
+							Init: &ast.Statement{
+								Kind: "let",
+								Name: "i",
+								Type: "u256",
+								Expr: &ast.Expr{Kind: "number", Value: "0"},
+							},
+							Cond: &ast.Expr{
+								Kind:  "binary",
+								Op:    "<",
+								Left:  &ast.Expr{Kind: "ident", Value: "i"},
+								Right: &ast.Expr{Kind: "number", Value: "3"},
+							},
+							Post: &ast.Expr{
+								Kind:  "binary",
+								Op:    "+",
+								Left:  &ast.Expr{Kind: "ident", Value: "i"},
+								Right: &ast.Expr{Kind: "number", Value: "1"},
+							},
+							Body: []ast.Statement{{Kind: "break"}},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsCallExprStatementAndForPostAssign(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "tick",
+					Body: []ast.Statement{{Kind: "return"}},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind:   "call",
+								Callee: &ast.Expr{Kind: "ident", Value: "tick"},
+							},
+						},
+						{
+							Kind: "for",
+							Init: &ast.Statement{
+								Kind: "let",
+								Name: "i",
+								Type: "u256",
+								Expr: &ast.Expr{Kind: "number", Value: "0"},
+							},
+							Cond: &ast.Expr{
+								Kind:  "binary",
+								Op:    "<",
+								Left:  &ast.Expr{Kind: "ident", Value: "i"},
+								Right: &ast.Expr{Kind: "number", Value: "3"},
+							},
+							Post: &ast.Expr{
+								Kind: "assign",
+								Op:   "=",
+								Left: &ast.Expr{Kind: "ident", Value: "i"},
+								Right: &ast.Expr{
+									Kind:  "binary",
+									Op:    "+",
+									Left:  &ast.Expr{Kind: "ident", Value: "i"},
+									Right: &ast.Expr{Kind: "number", Value: "1"},
+								},
+							},
+							Body: []ast.Statement{{Kind: "break"}},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestCheckRejectsNestedAssignInExprStatementCallArg(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "expr",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "foo",
+								},
+								Args: []*ast.Expr{
+									{
+										Kind: "assign",
+										Op:   "=",
+										Left: &ast.Expr{Kind: "ident", Value: "x"},
+										Right: &ast.Expr{
+											Kind:  "number",
+											Value: "1",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsNestedAssignInForPostCallArg(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "for",
+							Init: &ast.Statement{
+								Kind: "let",
+								Name: "i",
+								Type: "u256",
+								Expr: &ast.Expr{Kind: "number", Value: "0"},
+							},
+							Cond: &ast.Expr{
+								Kind:  "binary",
+								Op:    "<",
+								Left:  &ast.Expr{Kind: "ident", Value: "i"},
+								Right: &ast.Expr{Kind: "number", Value: "3"},
+							},
+							Post: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "tick",
+								},
+								Args: []*ast.Expr{
+									{
+										Kind: "assign",
+										Op:   "=",
+										Left: &ast.Expr{Kind: "ident", Value: "i"},
+										Right: &ast.Expr{
+											Kind:  "number",
+											Value: "1",
+										},
+									},
+								},
+							},
+							Body: []ast.Statement{{Kind: "break"}},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020, got: %v", diags)
 	}
 }

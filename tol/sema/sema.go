@@ -157,10 +157,18 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			}
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
+			if len(fn.Returns) > 0 && !containsReturnValueStmt(fn.Body) {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidReturn,
+					Message: fmt.Sprintf("function '%s' requires at least one return statement with value in current verifier stage", fn.Name),
+					Span:    defaultSpan(filename),
+				})
+			}
 			checkStorageFunctionBody(filename, slotInfos, fn.Params, fn.Body, &diags)
 		}
 
 		if m.Contract.Constructor != nil {
+			diags = append(diags, validateConstructorModifiers(filename, m.Contract.Constructor.Modifiers)...)
 			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
 			checkStatements(filename, m.Contract.Name, funcVis, funcArity, m.Contract.Constructor.Body, 0, &diags)
 			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
@@ -189,6 +197,22 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 			checkStatements(filename, contractName, funcVis, funcArity, []ast.Statement{*s.Init}, loopDepth, diags)
 		}
 		switch s.Kind {
+		case "let":
+			if containsAssignExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in let initializer",
+					Span:    defaultSpan(filename),
+				})
+			}
+		case "return":
+			if containsAssignExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in return expression",
+					Span:    defaultSpan(filename),
+				})
+			}
 		case "break":
 			if loopDepth <= 0 {
 				*diags = append(*diags, diag.Diagnostic{
@@ -213,11 +237,25 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
+			if containsAssignExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in set value expression",
+					Span:    defaultSpan(filename),
+				})
+			}
 		case "if":
 			if s.Cond == nil {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaMissingCondition,
 					Message: "if statement requires a condition expression",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if containsAssignExpr(s.Cond) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in if condition",
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -231,14 +269,134 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
+			if containsAssignExpr(s.Cond) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in while condition",
+					Span:    defaultSpan(filename),
+				})
+			}
 			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth+1, diags)
 		case "for":
+			if s.Cond != nil && containsAssignExpr(s.Cond) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "assignment expressions are not allowed in for condition",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if s.Post != nil && !isExprStatementExpr(s.Post) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "for post expression must be a function call or assignment expression",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if hasIllegalNestedAssignInStmtExpr(s.Post) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "nested assignment expressions are not allowed in for post expression",
+					Span:    defaultSpan(filename),
+				})
+			}
 			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth+1, diags)
+		case "expr":
+			if s.Expr == nil || !isExprStatementExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "expression statement must be a function call or assignment expression",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if hasIllegalNestedAssignInStmtExpr(s.Expr) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidAssignExpr,
+					Message: "nested assignment expressions are not allowed in expression statement",
+					Span:    defaultSpan(filename),
+				})
+			}
 		default:
 			checkStatements(filename, contractName, funcVis, funcArity, s.Then, loopDepth, diags)
 			checkStatements(filename, contractName, funcVis, funcArity, s.Else, loopDepth, diags)
 			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth, diags)
 		}
+	}
+}
+
+func isExprStatementExpr(e *ast.Expr) bool {
+	if e == nil {
+		return false
+	}
+	if e.Kind == "call" || e.Kind == "assign" {
+		return true
+	}
+	if e.Kind == "paren" {
+		return isExprStatementExpr(e.Left)
+	}
+	return false
+}
+
+func stripParens(e *ast.Expr) *ast.Expr {
+	cur := e
+	for cur != nil && cur.Kind == "paren" {
+		cur = cur.Left
+	}
+	return cur
+}
+
+func hasIllegalNestedAssignInStmtExpr(e *ast.Expr) bool {
+	root := stripParens(e)
+	if root == nil {
+		return false
+	}
+	switch root.Kind {
+	case "assign":
+		return containsAssignExpr(root.Left) || containsAssignExpr(root.Right)
+	case "call":
+		if containsAssignExpr(root.Callee) {
+			return true
+		}
+		for _, a := range root.Args {
+			if containsAssignExpr(a) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func containsAssignExpr(e *ast.Expr) bool {
+	if e == nil {
+		return false
+	}
+	if e.Kind == "assign" {
+		return true
+	}
+	switch e.Kind {
+	case "paren":
+		return containsAssignExpr(e.Left)
+	case "call":
+		if containsAssignExpr(e.Callee) {
+			return true
+		}
+		for _, a := range e.Args {
+			if containsAssignExpr(a) {
+				return true
+			}
+		}
+		return false
+	case "member":
+		return containsAssignExpr(e.Object)
+	case "index":
+		return containsAssignExpr(e.Object) || containsAssignExpr(e.Index)
+	case "binary":
+		return containsAssignExpr(e.Left) || containsAssignExpr(e.Right)
+	case "unary":
+		return containsAssignExpr(e.Right)
+	default:
+		return false
 	}
 }
 
@@ -267,6 +425,21 @@ func checkReturnStatements(filename, ownerKind, ownerName string, expectsValue b
 		checkReturnStatements(filename, ownerKind, ownerName, expectsValue, s.Else, diags)
 		checkReturnStatements(filename, ownerKind, ownerName, expectsValue, s.Body, diags)
 	}
+}
+
+func containsReturnValueStmt(stmts []ast.Statement) bool {
+	for _, s := range stmts {
+		if s.Kind == "return" && s.Expr != nil {
+			return true
+		}
+		if s.Init != nil && containsReturnValueStmt([]ast.Statement{*s.Init}) {
+			return true
+		}
+		if containsReturnValueStmt(s.Then) || containsReturnValueStmt(s.Else) || containsReturnValueStmt(s.Body) {
+			return true
+		}
+	}
+	return false
 }
 
 func ownerLabel(ownerKind, ownerName string) string {
@@ -808,6 +981,41 @@ func validateFunctionModifiers(filename string, fnName string, modifiers []strin
 	}
 
 	return vis, diags
+}
+
+func validateConstructorModifiers(filename string, modifiers []string) diag.Diagnostics {
+	var diags diag.Diagnostics
+	vis := ""
+	hasPayable := false
+	for _, m := range modifiers {
+		switch m {
+		case "public", "internal":
+			if vis != "" && vis != m {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("conflicting constructor visibility modifiers '%s' and '%s'", vis, m),
+					Span:    defaultSpan(filename),
+				})
+			}
+			vis = m
+		case "payable":
+			if hasPayable {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: "duplicate constructor modifier 'payable'",
+					Span:    defaultSpan(filename),
+				})
+			}
+			hasPayable = true
+		default:
+			diags = append(diags, diag.Diagnostic{
+				Code:    diag.CodeSemaInvalidFnModifier,
+				Message: fmt.Sprintf("unsupported constructor modifier '%s'", m),
+				Span:    defaultSpan(filename),
+			})
+		}
+	}
+	return diags
 }
 
 func duplicateParamDiagnostics(filename, ownerKind, ownerName string, params []ast.FieldDecl) diag.Diagnostics {

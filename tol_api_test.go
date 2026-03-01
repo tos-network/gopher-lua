@@ -182,6 +182,44 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsNonCallAssignExprStatement(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    1 + 2;
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected expression-statement shape error")
+	}
+	if !strings.Contains(err.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsNestedAssignInExprCallArg(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    foo((x = 1));
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected nested assign placement error")
+	}
+	if !strings.Contains(err.Error(), "TOL2020") {
+		t.Fatalf("expected TOL2020 sema error, got: %v", err)
+	}
+}
+
 func TestCompileTOLToBytecodeOnInvokeDispatchesByDefaultSelector(t *testing.T) {
 	src := []byte(`
 tol 0.2

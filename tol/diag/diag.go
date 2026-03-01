@@ -24,6 +24,7 @@ const (
 	CodeSemaInvalidReturn       = "TOL2017"
 	CodeSemaStorageAccess       = "TOL2018"
 	CodeSemaCallArity           = "TOL2019"
+	CodeSemaInvalidAssignExpr   = "TOL2020"
 	CodeLowerNotImplemented     = "TOL3001"
 	CodeLowerUnsupportedFeature = "TOL3002"
 	CodeCodegenNotImplemented   = "TOL4001"
