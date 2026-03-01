@@ -1274,6 +1274,43 @@ contract Demo {
 	}
 }
 
+func TestCompileTOLToBytecodeSelectorBuiltinLiteralWithParenCallee(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn mark() public {
+    set sel = (selector)("transfer(address,u256)");
+    return;
+  }
+}
+`)
+	bc, err := CompileTOLToBytecode(src, "<tol>")
+	if err != nil {
+		t.Fatalf("unexpected compile error: %v", err)
+	}
+	L := NewState()
+	defer L.Close()
+	if err := L.DoBytecode(bc); err != nil {
+		t.Fatalf("DoBytecode failed: %v", err)
+	}
+
+	tos := L.GetGlobal("tos")
+	oninvoke := L.GetField(tos, "oninvoke")
+	if oninvoke == LNil {
+		t.Fatalf("expected tos.oninvoke wrapper")
+	}
+
+	L.Push(oninvoke)
+	L.Push(LString(selectorHexFromSignature("mark()")))
+	if err := L.PCall(1, 0, nil); err != nil {
+		t.Fatalf("oninvoke call failed: %v", err)
+	}
+	want := selectorHexFromSignature("transfer(address,u256)")
+	if got := LVAsString(L.GetGlobal("sel")); got != want {
+		t.Fatalf("unexpected selector result: got=%s want=%s", got, want)
+	}
+}
+
 func TestCompileTOLToBytecodeSelectorBuiltinRejectsNonLiteralArg(t *testing.T) {
 	src := []byte(`
 tol 0.2

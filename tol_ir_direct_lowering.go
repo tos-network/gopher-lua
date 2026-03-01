@@ -1099,7 +1099,11 @@ func tolExprToLua(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, error) {
 }
 
 func lowerSelectorBuiltinExpr(e *tolast.Expr) (luast.Expr, bool, error) {
-	if e == nil || e.Kind != "call" || e.Callee == nil || e.Callee.Kind != "ident" || e.Callee.Value != "selector" {
+	if e == nil || e.Kind != "call" {
+		return nil, false, nil
+	}
+	callee := stripTolParens(e.Callee)
+	if callee == nil || callee.Kind != "ident" || strings.TrimSpace(callee.Value) != "selector" {
 		return nil, false, nil
 	}
 	if len(e.Args) != 1 {
@@ -1111,6 +1115,14 @@ func lowerSelectorBuiltinExpr(e *tolast.Expr) (luast.Expr, bool, error) {
 	}
 	sig := unquoteIfNeeded(arg.Value)
 	return withLineExpr(&luast.StringExpr{Value: selectorHexFromSignature(sig)}), true, nil
+}
+
+func stripTolParens(e *tolast.Expr) *tolast.Expr {
+	cur := e
+	for cur != nil && cur.Kind == "paren" {
+		cur = cur.Left
+	}
+	return cur
 }
 
 func lowerSelectorMemberExpr(ctx *loweringCtx, e *tolast.Expr) (luast.Expr, bool, error) {
