@@ -122,6 +122,49 @@ func TestCheckSetTargetMustBeAssignable(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsSetTargetSelectorMemberExpr(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:      "mark",
+					Modifiers: []string{"public"},
+				},
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "set",
+							Target: &ast.Expr{
+								Kind:   "member",
+								Member: "selector",
+								Object: &ast.Expr{
+									Kind:   "member",
+									Member: "mark",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "this",
+									},
+								},
+							},
+							Expr: &ast.Expr{Kind: "number", Value: "1"},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2008") {
+		t.Fatalf("expected TOL2008, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsInvalidSelectorOverride(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -792,6 +835,46 @@ func TestCheckAcceptsStorageArrayPushLengthAndIndex(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsSetStorageArrayLengthTarget(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Storage: &ast.StorageDecl{
+				Slots: []ast.StorageSlot{
+					{Name: "xs", Type: "u256[]"},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "set",
+							Target: &ast.Expr{
+								Kind:   "member",
+								Member: "length",
+								Object: &ast.Expr{
+									Kind:  "ident",
+									Value: "xs",
+								},
+							},
+							Expr: &ast.Expr{Kind: "number", Value: "1"},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2018") {
+		t.Fatalf("expected TOL2018, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsFunctionCallArityMismatch(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -1148,6 +1231,46 @@ func TestCheckRejectsEmitNonCallExpr(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsEmitMemberCallPayload(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:   "member",
+									Member: "Tick",
+									Object: &ast.Expr{
+										Kind:  "ident",
+										Value: "obj",
+									},
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021, got: %v", diags)
+	}
+}
+
 func TestCheckAcceptsEmitCallExpr(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -1178,6 +1301,114 @@ func TestCheckAcceptsEmitCallExpr(t *testing.T) {
 	_, diags := Check("<test>", m)
 	if diags.HasErrors() {
 		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestCheckRejectsEmitDeclaredEventArityMismatch(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Events: []ast.EventDecl{
+				{
+					Name: "Tick",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "b", Type: "u256"},
+					},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "Tick",
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2023") {
+		t.Fatalf("expected TOL2023, got: %v", diags)
+	}
+}
+
+func TestCheckAcceptsEmitDeclaredEventArityMatch(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Events: []ast.EventDecl{
+				{
+					Name: "Tick",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "b", Type: "u256"},
+					},
+				},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "Tick",
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+									{Kind: "number", Value: "2"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestCheckRejectsDuplicateEventDeclarations(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Events: []ast.EventDecl{
+				{Name: "Tick", Params: []ast.FieldDecl{{Name: "a", Type: "u256"}}},
+				{Name: "Tick", Params: []ast.FieldDecl{{Name: "b", Type: "u256"}}},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2024") {
+		t.Fatalf("expected TOL2024, got: %v", diags)
 	}
 }
 

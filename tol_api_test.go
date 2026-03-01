@@ -257,6 +257,62 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsEmitDeclaredEventArityMismatch(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event Tick(a: u256, b: u256)
+  fn run() public {
+    emit Tick(1);
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected emit arity error")
+	}
+	if !strings.Contains(err.Error(), "TOL2023") {
+		t.Fatalf("expected TOL2023 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsEmitMemberCallPayload(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    emit obj.Tick(1);
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected emit payload shape error")
+	}
+	if !strings.Contains(err.Error(), "TOL2021") {
+		t.Fatalf("expected TOL2021 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsDuplicateEventDeclarations(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event Tick(a: u256)
+  event Tick(b: u256)
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected duplicate event error")
+	}
+	if !strings.Contains(err.Error(), "TOL2024") {
+		t.Fatalf("expected TOL2024 sema error, got: %v", err)
+	}
+}
+
 func TestCompileTOLToBytecodeOnInvokeDispatchesByDefaultSelector(t *testing.T) {
 	src := []byte(`
 tol 0.2
@@ -873,6 +929,31 @@ contract Demo {
 		t.Fatalf("expected TOL2018 error, got: %v", err)
 	}
 	if !strings.Contains(err.Error(), "requires exactly 2 index key(s)") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCompileTOLToBytecodeStorageRejectsSetArrayLengthTarget(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  storage {
+    slot xs: u256[];
+  }
+  fn bad() public {
+    set xs.length = 1;
+    return;
+  }
+}
+`)
+	_, err := CompileTOLToBytecode(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected compile error")
+	}
+	if !strings.Contains(err.Error(), "TOL2018") {
+		t.Fatalf("expected TOL2018 error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "read-only") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

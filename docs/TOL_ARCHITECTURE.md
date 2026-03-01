@@ -71,12 +71,15 @@ Current parser/sema coverage in this branch:
    duplicate parameter-name checks, return-value shape checks
    (void/non-void/constructor/fallback),
    storage-access shape checks for implemented subset
-   (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints),
+   (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints,
+   including `.length` read-only target checks),
    contract-local function call arity checks, assignment-expression target checks,
    assignment-expression placement checks (value-context rejection),
    non-void function value-return presence checks (current conservative rule),
-   statement-shape checks for current subset (`require/assert` payload, `emit` call payload),
+   statement-shape checks for current subset (`require/assert` payload, `emit` identifier-call payload),
    `revert` payload shape checks (empty or string literal in current stage),
+   declared-event `emit` arity checks,
+   duplicate event-name checks,
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target

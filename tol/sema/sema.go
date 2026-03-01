@@ -80,11 +80,23 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 	if m.Contract != nil {
 		funcVis := map[string]string{}
 		funcArity := map[string]int{}
+		eventArity := map[string]int{}
 		for _, fn := range m.Contract.Functions {
 			vis, modDiags := validateFunctionModifiers(filename, fn.Name, fn.Modifiers)
 			diags = append(diags, modDiags...)
 			funcVis[fn.Name] = vis
 			funcArity[fn.Name] = len(fn.Params)
+		}
+		for _, ev := range m.Contract.Events {
+			if _, exists := eventArity[ev.Name]; exists {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaDuplicateEvent,
+					Message: fmt.Sprintf("duplicate event '%s'", ev.Name),
+					Span:    defaultSpan(filename),
+				})
+				continue
+			}
+			eventArity[ev.Name] = len(ev.Params)
 		}
 		slotInfos := map[string]storageSlotInfo{}
 
@@ -155,7 +167,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 					selectorSeen[key] = fn.Name
 				}
 			}
-			checkStatements(filename, m.Contract.Name, funcVis, funcArity, fn.Body, 0, &diags)
+			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, fn.Body, 0, &diags)
 			checkReturnStatements(filename, "function", fn.Name, len(fn.Returns) > 0, fn.Body, &diags)
 			if len(fn.Returns) > 0 && !containsReturnValueStmt(fn.Body) {
 				diags = append(diags, diag.Diagnostic{
@@ -170,12 +182,12 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		if m.Contract.Constructor != nil {
 			diags = append(diags, validateConstructorModifiers(filename, m.Contract.Constructor.Modifiers)...)
 			diags = append(diags, duplicateParamDiagnostics(filename, "constructor", "", m.Contract.Constructor.Params)...)
-			checkStatements(filename, m.Contract.Name, funcVis, funcArity, m.Contract.Constructor.Body, 0, &diags)
+			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, m.Contract.Constructor.Body, 0, &diags)
 			checkReturnStatements(filename, "constructor", "", false, m.Contract.Constructor.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, m.Contract.Constructor.Params, m.Contract.Constructor.Body, &diags)
 		}
 		if m.Contract.Fallback != nil {
-			checkStatements(filename, m.Contract.Name, funcVis, funcArity, m.Contract.Fallback.Body, 0, &diags)
+			checkStatements(filename, m.Contract.Name, funcVis, funcArity, eventArity, m.Contract.Fallback.Body, 0, &diags)
 			checkReturnStatements(filename, "fallback", "", false, m.Contract.Fallback.Body, &diags)
 			checkStorageFunctionBody(filename, slotInfos, nil, m.Contract.Fallback.Body, &diags)
 		}
@@ -187,14 +199,14 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 	return &TypedModule{AST: m}, nil
 }
 
-func checkStatements(filename string, contractName string, funcVis map[string]string, funcArity map[string]int, stmts []ast.Statement, loopDepth int, diags *diag.Diagnostics) {
+func checkStatements(filename string, contractName string, funcVis map[string]string, funcArity map[string]int, eventArity map[string]int, stmts []ast.Statement, loopDepth int, diags *diag.Diagnostics) {
 	for _, s := range stmts {
 		checkExpr(contractName, funcVis, funcArity, filename, s.Expr, diags)
 		checkExpr(contractName, funcVis, funcArity, filename, s.Target, diags)
 		checkExpr(contractName, funcVis, funcArity, filename, s.Cond, diags)
 		checkExpr(contractName, funcVis, funcArity, filename, s.Post, diags)
 		if s.Init != nil {
-			checkStatements(filename, contractName, funcVis, funcArity, []ast.Statement{*s.Init}, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, []ast.Statement{*s.Init}, loopDepth, diags)
 		}
 		switch s.Kind {
 		case "let":
@@ -252,12 +264,34 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Message: "emit statement requires a call-like payload (e.g. emit EventName(...))",
 					Span:    defaultSpan(filename),
 				})
+			} else {
+				name, argc, ok := emitCallInfo(s.Expr)
+				if !ok {
+					*diags = append(*diags, diag.Diagnostic{
+						Code:    diag.CodeSemaInvalidStmtShape,
+						Message: "emit statement payload must call an event identifier (e.g. EventName(...))",
+						Span:    defaultSpan(filename),
+					})
+				} else if want, exists := eventArity[name]; exists && argc != want {
+					*diags = append(*diags, diag.Diagnostic{
+						Code:    diag.CodeSemaEmitArity,
+						Message: fmt.Sprintf("emit event '%s' expects %d argument(s), got %d", name, want, argc),
+						Span:    defaultSpan(filename),
+					})
+				}
 			}
 		case "set":
 			if !isAssignableTarget(s.Target) {
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidSetTarget,
 					Message: "set target must be identifier, member access, or index access",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if isSelectorMemberExpr(s.Target) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidSetTarget,
+					Message: "selector member expression is read-only and cannot be assignment target",
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -283,8 +317,8 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
-			checkStatements(filename, contractName, funcVis, funcArity, s.Then, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, funcArity, s.Else, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Then, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Else, loopDepth, diags)
 		case "while":
 			if s.Cond == nil {
 				*diags = append(*diags, diag.Diagnostic{
@@ -300,7 +334,7 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
-			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth+1, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Body, loopDepth+1, diags)
 		case "for":
 			if s.Cond != nil && containsAssignExpr(s.Cond) {
 				*diags = append(*diags, diag.Diagnostic{
@@ -323,7 +357,7 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 					Span:    defaultSpan(filename),
 				})
 			}
-			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth+1, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Body, loopDepth+1, diags)
 		case "expr":
 			if s.Expr == nil || !isExprStatementExpr(s.Expr) {
 				*diags = append(*diags, diag.Diagnostic{
@@ -340,9 +374,9 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				})
 			}
 		default:
-			checkStatements(filename, contractName, funcVis, funcArity, s.Then, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, funcArity, s.Else, loopDepth, diags)
-			checkStatements(filename, contractName, funcVis, funcArity, s.Body, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Then, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Else, loopDepth, diags)
+			checkStatements(filename, contractName, funcVis, funcArity, eventArity, s.Body, loopDepth, diags)
 		}
 	}
 }
@@ -363,6 +397,27 @@ func isExprStatementExpr(e *ast.Expr) bool {
 func isCallExpr(e *ast.Expr) bool {
 	root := stripParens(e)
 	return root != nil && root.Kind == "call"
+}
+
+func isSelectorMemberExpr(e *ast.Expr) bool {
+	root := stripParens(e)
+	return root != nil && root.Kind == "member" && root.Member == "selector"
+}
+
+func emitCallInfo(e *ast.Expr) (string, int, bool) {
+	root := stripParens(e)
+	if root == nil || root.Kind != "call" {
+		return "", 0, false
+	}
+	callee := stripParens(root.Callee)
+	if callee == nil || callee.Kind != "ident" {
+		return "", 0, false
+	}
+	name := strings.TrimSpace(callee.Value)
+	if name == "" {
+		return "", 0, false
+	}
+	return name, len(root.Args), true
 }
 
 func isStringLiteralExpr(e *ast.Expr) bool {
@@ -667,6 +722,10 @@ func checkStorageSetTarget(filename string, ctx *storageCheckCtx, target *ast.Ex
 	if target == nil {
 		return
 	}
+	if slotName, ok := storageArrayLengthMemberTarget(ctx, target); ok {
+		reportStorageAccess(filename, fmt.Sprintf("storage array length on slot '%s' is read-only in current stage", slotName), diags)
+		return
+	}
 	if slotName, keys, ok := ctx.storagePathFromExpr(target); ok {
 		info := ctx.slots[slotName]
 		checkStorageKeys(filename, ctx, keys, diags)
@@ -736,6 +795,22 @@ func checkStorageExpr(filename string, ctx *storageCheckCtx, e *ast.Expr, use st
 	default:
 		// leaf nodes
 	}
+}
+
+func storageArrayLengthMemberTarget(ctx *storageCheckCtx, e *ast.Expr) (string, bool) {
+	root := stripParens(e)
+	if root == nil || root.Kind != "member" || root.Member != "length" {
+		return "", false
+	}
+	slotName, keys, ok := ctx.storagePathFromExpr(root.Object)
+	if !ok || len(keys) != 0 {
+		return "", false
+	}
+	info := ctx.slots[slotName]
+	if info.kind != storageKindArray {
+		return "", false
+	}
+	return slotName, true
 }
 
 func checkStorageKeys(filename string, ctx *storageCheckCtx, keys []*ast.Expr, diags *diag.Diagnostics) {

@@ -27,6 +27,8 @@ const (
 	CodeSemaInvalidAssignExpr   = "TOL2020"
 	CodeSemaInvalidStmtShape    = "TOL2021"
 	CodeSemaInvalidRevert       = "TOL2022"
+	CodeSemaEmitArity           = "TOL2023"
+	CodeSemaDuplicateEvent      = "TOL2024"
 	CodeLowerNotImplemented     = "TOL3001"
 	CodeLowerUnsupportedFeature = "TOL3002"
 	CodeCodegenNotImplemented   = "TOL4001"
