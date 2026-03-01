@@ -49,6 +49,18 @@ func TestEncodeTORRejectsInvalidManifestJSON(t *testing.T) {
 	}
 }
 
+func TestEncodeTORRejectsManifestMissingName(t *testing.T) {
+	if _, err := EncodeTOR([]byte(`{"version":"1.0.0"}`), nil); err == nil {
+		t.Fatalf("expected missing name error")
+	}
+}
+
+func TestEncodeTORRejectsManifestMissingVersion(t *testing.T) {
+	if _, err := EncodeTOR([]byte(`{"name":"demo"}`), nil); err == nil {
+		t.Fatalf("expected missing version error")
+	}
+}
+
 func TestEncodeTORRejectsPathEscape(t *testing.T) {
 	manifest := []byte(`{"name":"demo","version":"1.0.0"}`)
 	if _, err := EncodeTOR(manifest, map[string][]byte{"../x": []byte("x")}); err == nil {
@@ -89,6 +101,24 @@ func TestDecodeTORRejectsInvalidManifestJSON(t *testing.T) {
 	}
 	if _, err := DecodeTOR(buf.Bytes()); err == nil {
 		t.Fatalf("expected invalid manifest json error")
+	}
+}
+
+func TestDecodeTORRejectsManifestMissingRequiredFields(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	mw, err := zw.Create("manifest.json")
+	if err != nil {
+		t.Fatalf("create manifest entry: %v", err)
+	}
+	if _, err := mw.Write([]byte(`{"name":"demo"}`)); err != nil {
+		t.Fatalf("write manifest entry: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+	if _, err := DecodeTOR(buf.Bytes()); err == nil {
+		t.Fatalf("expected missing version error")
 	}
 }
 

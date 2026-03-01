@@ -44,8 +44,8 @@ func TORPackageHash(data []byte) string {
 
 // EncodeTOR serializes manifest + files into deterministic .tor bytes.
 func EncodeTOR(manifestJSON []byte, files map[string][]byte) ([]byte, error) {
-	if !json.Valid(manifestJSON) {
-		return nil, fmt.Errorf("tor manifest is not valid json")
+	if err := validateTORManifest(manifestJSON); err != nil {
+		return nil, err
 	}
 
 	cleanFiles := map[string][]byte{}
@@ -127,13 +127,33 @@ func DecodeTOR(data []byte) (*TORArtifact, error) {
 	if len(manifest) == 0 {
 		return nil, fmt.Errorf("tor manifest.json not found")
 	}
-	if !json.Valid(manifest) {
-		return nil, fmt.Errorf("tor manifest is not valid json")
+	if err := validateTORManifest(manifest); err != nil {
+		return nil, err
 	}
 	return &TORArtifact{
 		ManifestJSON: manifest,
 		Files:        files,
 	}, nil
+}
+
+func validateTORManifest(manifestJSON []byte) error {
+	if !json.Valid(manifestJSON) {
+		return fmt.Errorf("tor manifest is not valid json")
+	}
+	var m struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(manifestJSON, &m); err != nil {
+		return fmt.Errorf("tor manifest decode error: %w", err)
+	}
+	if strings.TrimSpace(m.Name) == "" {
+		return fmt.Errorf("tor manifest requires non-empty 'name'")
+	}
+	if strings.TrimSpace(m.Version) == "" {
+		return fmt.Errorf("tor manifest requires non-empty 'version'")
+	}
+	return nil
 }
 
 func writeTORZipEntry(zw *zip.Writer, name string, body []byte) error {

@@ -15,6 +15,7 @@ Currently landed in `tolang`:
   - `EncodeTOC(...)` / `DecodeTOC(...)`
   - `VerifyTOCSourceHash(toc, sourceBytes)`
   - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
+    (`manifest.name` and `manifest.version` are required)
 - CLI:
   - `tolang -ctoc out.toc input.tol`
   - `tolang -dtoc artifact.toc`

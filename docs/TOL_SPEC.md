@@ -829,7 +829,8 @@ Implemented:
 32. `.tor` archive baseline is available in API form:
     deterministic ZIP(`store`) encoding with canonical ordering
     (`manifest.json` first, then lexicographically sorted entries),
-    path-safety validation, manifest JSON validation, and package hash helper.
+    path-safety validation, manifest JSON validation (`name`/`version` required),
+    and package hash helper.
 
 Partially implemented:
 
