@@ -456,7 +456,33 @@ trc20.tol  function coverage:
 Function coverage: 5/6 (83%)
 ```
 
-### 6.2 Branch coverage
+### 6.2 Line coverage
+
+Which source lines were executed at least once. Requires the compiler to emit
+a source map (`tol compile --sourcemap`) that links each Lua bytecode instruction
+back to a `.tol` source line.
+
+```
+trc20.tol  line coverage:
+  line 28  fn totalSupply()              ✓
+  line 29    let s: u256 = total_supply  ✓
+  line 30    return s                    ✓
+  line 33  fn balanceOf(owner)           ✓
+  ...
+  line 70  fallback                      ✗   (not reached)
+
+Line coverage: 18/20 (90%)
+```
+
+The HTML report annotates the source file with colors:
+- **Green** — line executed
+- **Yellow** — line partially covered (branch not fully taken)
+- **Red** — line never executed
+
+This is the primary visual output of JaCoCo and the most useful for auditors.
+Implementation requires source-map support in the compiler (planned for P4).
+
+### 6.3 Branch coverage
 
 Which conditional branches (`if`/`else`, `require` pass/fail) were taken.
 
@@ -472,7 +498,7 @@ trc20.tol  branch coverage:
 Branch coverage: 5/6 (83%)
 ```
 
-### 6.3 Storage slot coverage
+### 6.4 Storage slot coverage
 
 Which storage slots were read and written.
 
@@ -483,7 +509,7 @@ trc20.tol  storage slot coverage:
   allowances       read ✓  written ✓
 ```
 
-### 6.4 Cyclomatic complexity
+### 6.5 Cyclomatic complexity
 
 The runner reports cyclomatic complexity (CC) per function — the number of
 linearly independent paths through the function. Functions with CC > 10 are
@@ -491,36 +517,70 @@ flagged as candidates for additional test cases.
 
 ```
 trc20.tol  cyclomatic complexity:
-  totalSupply()                   CC=1  ✓
-  balanceOf(address)              CC=1  ✓
-  transfer(address, u256)         CC=3  ✓
-  approve(address, u256)          CC=1  ✓
-  transferFrom(address,address,u256)  CC=5  ✓
+  totalSupply()                        CC=1
+  balanceOf(address)                   CC=1
+  transfer(address, u256)              CC=3
+  approve(address, u256)               CC=1
+  transferFrom(address, address, u256) CC=5
 ```
 
 Equivalent to JaCoCo's complexity metric. High CC means the function has many
 possible execution paths and likely needs more parameterized test cases.
 
-### 6.5 Coverage threshold enforcement
+### 6.6 Coverage threshold enforcement
 
 ```sh
 tol test -cover -covermin 80
+tol test -cover -covermin line=90,branch=80,function=100
 ```
 
-Exits with code 3 if any coverage dimension (function, branch) falls below the
-specified percentage. Enforces coverage discipline in CI pipelines — equivalent
-to JaCoCo Maven plugin `<haltOnFailure>` with minimum ratio rules.
+Exits with code 3 if any coverage dimension falls below the specified percentage.
+Dimensions can be set independently: `line`, `branch`, `function`.
+Equivalent to JaCoCo Maven plugin `<haltOnFailure>` with per-counter minimum ratios.
 
-### 6.6 Coverage output formats
+### 6.7 Coverage output formats
 
 ```sh
-tol test -cover -coverformat=text    # terminal table (default)
-tol test -cover -coverformat=json    # machine-readable JSON
-tol test -cover -coverformat=html    # annotated source HTML
+tol test -cover -coverformat=text    # terminal summary table (default)
+tol test -cover -coverformat=json    # machine-readable JSON (all dimensions)
+tol test -cover -coverformat=xml     # JaCoCo-compatible XML (for SonarQube, Codecov)
+tol test -cover -coverformat=html    # annotated source HTML (line-level colors)
+tol test -cover -coverformat=lcov    # LCOV format (for genhtml, VS Code extensions)
 ```
 
-HTML output annotates each source line with a color indicating coverage status,
-identical in concept to JaCoCo's HTML report.
+**HTML report** (JaCoCo equivalent):
+- Each source line colored: green (covered), yellow (partial branch), red (not covered).
+- Drill-down from project → contract → function → source line.
+- Requires compiler `--sourcemap` output to map bytecode instructions to source lines.
+
+**XML report** (JaCoCo-compatible schema):
+- Consumed by SonarQube, Codecov, GitHub Actions coverage annotations, and CI dashboards.
+- Example:
+```xml
+<report name="trc20.tol">
+  <counter type="LINE"     missed="2"  covered="18"/>
+  <counter type="BRANCH"   missed="1"  covered="5"/>
+  <counter type="METHOD"   missed="1"  covered="5"/>
+  <counter type="COMPLEXITY" missed="0" covered="11"/>
+</report>
+```
+
+### 6.8 Project-level summary
+
+After running all test files, the runner prints a rollup across all contracts:
+
+```
+Coverage summary:
+  File                   Lines    Branches  Functions  Complexity
+  trc20.tol              90%      83%       83%        CC avg=2.2
+  trc721.tol             75%      70%       80%        CC avg=3.1
+  ─────────────────────────────────────────────────────────────
+  TOTAL                  83%      77%       81%
+
+FAIL: branch coverage 77% is below -covermin 80%
+```
+
+Equivalent to JaCoCo's project-level aggregated report.
 
 ---
 
@@ -567,12 +627,16 @@ identical in concept to JaCoCo's HTML report.
 | Contract deploy | N/A | N/A | N/A | `deployContract` | `deploy` statement |
 | Call context override | N/A | N/A | N/A | `connect(signer)` | `with msg.sender` |
 | Instruction limit | `@Timeout` (wall) | Perf assert | N/A | No | `assert_instructions_le` |
+| Line coverage | No | Yes | **Yes** | No | Yes (needs sourcemap) |
+| Branch coverage | No | Yes | **Yes** | No | Yes |
 | Function coverage | No | Yes | Yes | No | Yes |
-| Branch coverage | No | Yes | Yes | No | Yes |
 | Storage slot coverage | N/A | N/A | N/A | N/A | **Yes (unique)** |
 | Cyclomatic complexity | No | Yes | Yes | No | Yes |
 | Coverage threshold | No | Yes | Yes | No | `-covermin` |
-| Coverage HTML | No | Yes | Yes | No | Yes |
+| Coverage HTML (line colors) | No | Yes | **Yes** | No | Yes |
+| Coverage XML (SonarQube) | No | Yes | **Yes** | No | Yes |
+| Coverage LCOV | No | No | No | No | Yes |
+| Project-level rollup | No | Yes | **Yes** | No | Yes |
 | Auto test generation | No | **Yes** | N/A | No | Not yet (P5) |
 | State isolation | Manual | Manual | N/A | Manual `beforeEach` | **Automatic** |
 | Determinism guarantee | No | No | N/A | No | **Yes** |
@@ -618,6 +682,6 @@ identical in concept to JaCoCo's HTML report.
 | P1 | `setup`/`teardown` lifecycle; storage isolation per test; basic pass/fail reporting |
 | P2 | `setup_suite`/`teardown_suite`; `assert_event`; `inspect`; `#[skip]`; `#[tag]`; custom messages |
 | P3 | `assert_all`; `assert_gt/lt/between`; `assert_instructions_le`; `#[cases]` parameterized tests |
-| P4 | Coverage (function + branch + storage slot + cyclomatic complexity); HTML output; `-covermin` |
+| P4 | Coverage: function + branch + storage slot + cyclomatic complexity + **line** (requires sourcemap); HTML line-annotated output; XML (JaCoCo-compatible); LCOV; project rollup; `-covermin` per-dimension |
 | P5 | `#[fuzz]` fuzz entry points; `mock` contracts; differential testing vs. reference Solidity |
 | P6 | AI-assisted test generation from contract source (equivalent to JTest auto-generation) |
