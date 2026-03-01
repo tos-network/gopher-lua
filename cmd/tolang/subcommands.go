@@ -129,6 +129,10 @@ func cmdCompile(args []string) int {
 	switch emit {
 	case "toc", "toi", "tor":
 	default:
+		if emit == "glbc" {
+			fmt.Println("emit format 'glbc' is not implemented in current stage")
+			return 1
+		}
 		fmt.Printf("unsupported --emit value %q (expected toc|toi|tor)\n", emit)
 		return 1
 	}

@@ -440,6 +440,9 @@ func TestCmdCompileRejectsInvalidFlagCombinations(t *testing.T) {
 	if code := cmdCompile([]string{"--emit", "toc", "--include-source", input}); code != 1 {
 		t.Fatalf("--include-source with emit=toc: got=%d want=1", code)
 	}
+	if code := cmdCompile([]string{"--emit", "glbc", input}); code != 1 {
+		t.Fatalf("--emit glbc should fail with explicit not-implemented status: got=%d want=1", code)
+	}
 }
 
 func TestCmdPackRejectsMissingOutputOrBadInput(t *testing.T) {
