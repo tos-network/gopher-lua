@@ -774,6 +774,7 @@ Implemented:
     on top-level storage arrays (`.length` is read-only).
 15. Early semantic verifier validates local contract-call arity and assignment-expression
     target assignability in expression context.
+    Assignment targets using literal identifiers (`true`/`false`/`nil`) are rejected.
 16. Early semantic verifier restricts assignment-expression placement to supported
     statement contexts (expression statement / `for` post), rejecting value-context use.
 17. Non-void functions require at least one explicit value-return statement in
@@ -784,6 +785,7 @@ Implemented:
 20. For declared events, `emit EventName(...)` argument count is verifier-checked
     against the declaration arity.
 21. Event declaration names are uniqueness-checked at contract scope.
+22. If a contract declares events, `emit` must reference a declared event name.
 
 Partially implemented:
 

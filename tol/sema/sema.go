@@ -272,10 +272,18 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 						Message: "emit statement payload must call an event identifier (e.g. EventName(...))",
 						Span:    defaultSpan(filename),
 					})
-				} else if want, exists := eventArity[name]; exists && argc != want {
+				} else if want, exists := eventArity[name]; exists {
+					if argc != want {
+						*diags = append(*diags, diag.Diagnostic{
+							Code:    diag.CodeSemaEmitArity,
+							Message: fmt.Sprintf("emit event '%s' expects %d argument(s), got %d", name, want, argc),
+							Span:    defaultSpan(filename),
+						})
+					}
+				} else if len(eventArity) > 0 {
 					*diags = append(*diags, diag.Diagnostic{
-						Code:    diag.CodeSemaEmitArity,
-						Message: fmt.Sprintf("emit event '%s' expects %d argument(s), got %d", name, want, argc),
+						Code:    diag.CodeSemaUnknownEmitEvent,
+						Message: fmt.Sprintf("emit event '%s' is not declared in contract", name),
 						Span:    defaultSpan(filename),
 					})
 				}
@@ -285,6 +293,12 @@ func checkStatements(filename string, contractName string, funcVis map[string]st
 				*diags = append(*diags, diag.Diagnostic{
 					Code:    diag.CodeSemaInvalidSetTarget,
 					Message: "set target must be identifier, member access, or index access",
+					Span:    defaultSpan(filename),
+				})
+			} else if isReadOnlyIdentTarget(s.Target) {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaInvalidSetTarget,
+					Message: "set target cannot be 'true', 'false', or 'nil'",
 					Span:    defaultSpan(filename),
 				})
 			}
@@ -402,6 +416,19 @@ func isCallExpr(e *ast.Expr) bool {
 func isSelectorMemberExpr(e *ast.Expr) bool {
 	root := stripParens(e)
 	return root != nil && root.Kind == "member" && root.Member == "selector"
+}
+
+func isReadOnlyIdentTarget(e *ast.Expr) bool {
+	root := stripParens(e)
+	if root == nil || root.Kind != "ident" {
+		return false
+	}
+	switch strings.TrimSpace(root.Value) {
+	case "true", "false", "nil":
+		return true
+	default:
+		return false
+	}
 }
 
 func emitCallInfo(e *ast.Expr) (string, int, bool) {
@@ -989,6 +1016,12 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 			*diags = append(*diags, diag.Diagnostic{
 				Code:    diag.CodeSemaInvalidSetTarget,
 				Message: "assignment target must be identifier, member access, or index access",
+				Span:    defaultSpan(filename),
+			})
+		} else if isReadOnlyIdentTarget(e.Left) {
+			*diags = append(*diags, diag.Diagnostic{
+				Code:    diag.CodeSemaInvalidSetTarget,
+				Message: "assignment target cannot be 'true', 'false', or 'nil'",
 				Span:    defaultSpan(filename),
 			})
 		}

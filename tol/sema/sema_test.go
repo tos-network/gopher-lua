@@ -122,6 +122,34 @@ func TestCheckSetTargetMustBeAssignable(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsSetTargetReservedLiteralIdent(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind:   "set",
+							Target: &ast.Expr{Kind: "ident", Value: "true"},
+							Expr:   &ast.Expr{Kind: "number", Value: "1"},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2008") {
+		t.Fatalf("expected TOL2008, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsSetTargetSelectorMemberExpr(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -1409,6 +1437,78 @@ func TestCheckRejectsDuplicateEventDeclarations(t *testing.T) {
 	}
 	if !strings.Contains(diags.Error(), "TOL2024") {
 		t.Fatalf("expected TOL2024, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Events: []ast.EventDecl{
+				{Name: "Tick", Params: []ast.FieldDecl{{Name: "a", Type: "u256"}}},
+			},
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "Other",
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2025") {
+		t.Fatalf("expected TOL2025, got: %v", diags)
+	}
+}
+
+func TestCheckAllowsEmitWhenNoEventsDeclared(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "run",
+					Body: []ast.Statement{
+						{
+							Kind: "emit",
+							Expr: &ast.Expr{
+								Kind: "call",
+								Callee: &ast.Expr{
+									Kind:  "ident",
+									Value: "Tick",
+								},
+								Args: []*ast.Expr{
+									{Kind: "number", Value: "1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 }
 

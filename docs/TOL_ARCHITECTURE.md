@@ -74,11 +74,13 @@ Current parser/sema coverage in this branch:
    (mapping depth arity, scalar indexing rejection, array `.length`/`.push` constraints,
    including `.length` read-only target checks),
    contract-local function call arity checks, assignment-expression target checks,
+   literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    assignment-expression placement checks (value-context rejection),
    non-void function value-return presence checks (current conservative rule),
    statement-shape checks for current subset (`require/assert` payload, `emit` identifier-call payload),
    `revert` payload shape checks (empty or string literal in current stage),
    declared-event `emit` arity checks,
+   declared-event-name resolution checks for `emit`,
    duplicate event-name checks,
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation

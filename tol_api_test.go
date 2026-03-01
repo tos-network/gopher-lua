@@ -162,6 +162,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsSetTargetReservedLiteralIdent(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    set true = 1;
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected set-target error")
+	}
+	if !strings.Contains(err.Error(), "TOL2008") {
+		t.Fatalf("expected TOL2008 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsFunctionCallArityMismatch(t *testing.T) {
 	src := []byte(`
 tol 0.2
@@ -310,6 +329,26 @@ contract Demo {
 	}
 	if !strings.Contains(err.Error(), "TOL2024") {
 		t.Fatalf("expected TOL2024 sema error, got: %v", err)
+	}
+}
+
+func TestBuildIRFromTOLRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event Tick(a: u256)
+  fn run() public {
+    emit Other(1);
+    return;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unknown emit event error")
+	}
+	if !strings.Contains(err.Error(), "TOL2025") {
+		t.Fatalf("expected TOL2025 sema error, got: %v", err)
 	}
 }
 
