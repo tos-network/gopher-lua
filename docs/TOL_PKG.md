@@ -11,7 +11,8 @@ Scope: File formats, package layout, standard library, and on-chain registry
 Currently landed in `tolang`:
 
 - API:
-  - `CompileTOLToTOI(source, name)` -> compile `.tol` to textual `.toi`
+  - `CompileTOLToTOI(source, name)` / `CompileTOLToTOIWithOptions(...)`
+    -> compile `.tol` to textual `.toi`
   - `CompileTOLToTOC(source, name)` -> compile `.tol` to deterministic `.toc`
   - `CompileTOLToTOR(source, name, opts)` -> compile `.tol` to minimal `.tor`
   - `EncodeTOC(...)` / `DecodeTOC(...)`
@@ -22,6 +23,7 @@ Currently landed in `tolang`:
     `.toc` entries are decode-validated during `DecodeTOR`
 - CLI:
   - `tolang -ctoi out.toi input.tol`
+  - `tolang -ctoi out.toi -ctoiname MyIface input.tol`
   - `tolang -ctoc out.toc input.tol`
   - `tolang -dtoc artifact.toc`
   - `tolang -dtocj artifact.toc`

@@ -76,3 +76,21 @@ func TestBuildTOIFromModuleRejectsNil(t *testing.T) {
 		t.Fatalf("expected nil module error")
 	}
 }
+
+func TestCompileTOLToTOIWithCustomInterfaceName(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	toi, err := CompileTOLToTOIWithOptions(src, "<tol>", &TOICompileOptions{
+		InterfaceName: "DemoSurface",
+	})
+	if err != nil {
+		t.Fatalf("unexpected toi compile error: %v", err)
+	}
+	if !strings.Contains(string(toi), "interface DemoSurface {") {
+		t.Fatalf("expected custom interface name, got:\n%s", string(toi))
+	}
+}

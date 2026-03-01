@@ -7,17 +7,32 @@ import (
 	tolast "github.com/tos-network/tolang/tol/ast"
 )
 
+// TOICompileOptions configures .toi textual generation.
+type TOICompileOptions struct {
+	InterfaceName string
+}
+
 // CompileTOLToTOI compiles TOL source into a textual .toi interface declaration.
 func CompileTOLToTOI(source []byte, name string) ([]byte, error) {
+	return CompileTOLToTOIWithOptions(source, name, nil)
+}
+
+// CompileTOLToTOIWithOptions compiles TOL source into textual .toi with options.
+func CompileTOLToTOIWithOptions(source []byte, name string, opts *TOICompileOptions) ([]byte, error) {
 	mod, err := ParseTOLModule(source, name)
 	if err != nil {
 		return nil, err
 	}
-	return BuildTOIFromModule(mod)
+	return BuildTOIFromModuleWithOptions(mod, opts)
 }
 
 // BuildTOIFromModule renders a parsed module into a textual interface declaration.
 func BuildTOIFromModule(mod *tolast.Module) ([]byte, error) {
+	return BuildTOIFromModuleWithOptions(mod, nil)
+}
+
+// BuildTOIFromModuleWithOptions renders a parsed module into textual interface declaration.
+func BuildTOIFromModuleWithOptions(mod *tolast.Module, opts *TOICompileOptions) ([]byte, error) {
 	if mod == nil || mod.Contract == nil {
 		return nil, fmt.Errorf("toi build requires a contract declaration")
 	}
@@ -30,6 +45,9 @@ func BuildTOIFromModule(mod *tolast.Module) ([]byte, error) {
 		version = "0.2"
 	}
 	interfaceName := "I" + contractName
+	if opts != nil && strings.TrimSpace(opts.InterfaceName) != "" {
+		interfaceName = strings.TrimSpace(opts.InterfaceName)
+	}
 
 	var b strings.Builder
 	b.WriteString("tol ")

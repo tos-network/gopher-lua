@@ -23,7 +23,7 @@ func main() {
 }
 
 func mainAux() int {
-	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver string
+	var opt_e, opt_l, opt_p, opt_c, opt_ctol, opt_ctoi, opt_ctoiname, opt_ctoc, opt_ctor, opt_vtocsrc, opt_ctorpkg, opt_ctorver string
 	var opt_i, opt_v, opt_dt, opt_dc, opt_di, opt_bc, opt_dtol, opt_dtoc, opt_dtocj, opt_vtoc, opt_dtor, opt_dtorj, opt_vtor, opt_ctorsrc bool
 	flag.StringVar(&opt_e, "e", "", "")
 	flag.StringVar(&opt_l, "l", "", "")
@@ -31,6 +31,7 @@ func mainAux() int {
 	flag.StringVar(&opt_c, "c", "", "")
 	flag.StringVar(&opt_ctol, "ctol", "", "")
 	flag.StringVar(&opt_ctoi, "ctoi", "", "")
+	flag.StringVar(&opt_ctoiname, "ctoiname", "", "")
 	flag.StringVar(&opt_ctoc, "ctoc", "", "")
 	flag.StringVar(&opt_ctor, "ctor", "", "")
 	flag.StringVar(&opt_ctorpkg, "ctorpkg", "", "")
@@ -58,6 +59,7 @@ func mainAux() int {
 	  -c file  compile source script to bytecode file
 	  -ctol file  compile TOL source script to bytecode file (skeleton path)
 	  -ctoi file  compile TOL source script to .toi interface file
+	  -ctoiname name  interface name override for -ctoi
 	  -ctoc file  compile TOL source script to .toc artifact file
 	  -ctor file  package a directory into .tor archive file
 	  -ctorpkg name  package name override for one-shot -ctor <file.tol>
@@ -110,6 +112,10 @@ func mainAux() int {
 	}
 	if len(opt_vtocsrc) > 0 && !opt_vtoc {
 		fmt.Println("-vtocsrc requires -vtoc")
+		return 1
+	}
+	if len(opt_ctoiname) > 0 && len(opt_ctoi) == 0 {
+		fmt.Println("-ctoiname requires -ctoi")
 		return 1
 	}
 	if (len(opt_ctorpkg) > 0 || len(opt_ctorver) > 0 || opt_ctorsrc) && len(opt_ctor) == 0 {
@@ -214,7 +220,9 @@ func mainAux() int {
 			fmt.Println(err.Error())
 			return 1
 		}
-		toi, err := lua.CompileTOLToTOI(src, input)
+		toi, err := lua.CompileTOLToTOIWithOptions(src, input, &lua.TOICompileOptions{
+			InterfaceName: opt_ctoiname,
+		})
 		if err != nil {
 			fmt.Println(err.Error())
 			return 1

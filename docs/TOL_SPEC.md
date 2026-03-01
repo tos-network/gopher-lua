@@ -757,13 +757,15 @@ Implemented:
    and `@selector("0x........")` override.
 7. Constructor hook works and forwards runtime args via `tos.oncreate(...)`.
 8. Toolchain exists:
-   - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOI`, `BuildTOIFromModule`, `CompileTOLToTOC`,
+   - APIs: `BuildIRFromTOL`, `CompileTOLToBytecode`, `CompileTOLToTOI`, `CompileTOLToTOIWithOptions`,
+     `BuildTOIFromModule`, `BuildTOIFromModuleWithOptions`, `CompileTOLToTOC`,
      `EncodeTOC`, `DecodeTOC`, `VerifyTOCSourceHash`,
      `EncodeTOR`, `DecodeTOR`, `TORPackageHash`, `CompileTOLToTOR`
    - CLI: `tolang -ctol`, `tolang -ctoi`, `tolang -ctoc`, `tolang -dtol`, `tolang -dtoc`,
      `tolang -dtocj`, `tolang -vtoc`, `tolang -vtoc -vtocsrc <source.tol>`,
      `tolang -ctor` (directory or one-shot `.tol` input), `tolang -dtor`,
-     `tolang -dtorj`, `tolang -vtor`, and one-shot `-ctorpkg/-ctorver/-ctorsrc`
+     `tolang -dtorj`, `tolang -vtor`, one-shot `-ctorpkg/-ctorver/-ctorsrc`,
+     and `.toi` name override `-ctoiname`
 9. Deterministic integer intrinsics available in runtime math lib:
    `math.binaryLog`, `math.pow2` (with `lower/mid/upper` modes) and tests.
 10. `selector("sig")` literal calls are lowered as compile-time selector constants
