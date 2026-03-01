@@ -808,10 +808,10 @@ Implemented:
     (`return`, `revert`, loop-body `break/continue`, or `if/else` where both branches terminate).
 28. Contract-scoped member calls (`this.fn(...)`, `Contract.fn(...)`) must
     resolve to declared contract functions and target `public/external` functions only.
-29. Function name `selector` is reserved for builtin `selector("...")` and
-    cannot be declared as a contract function name.
-30. Function names using internal prefix `__tol_` are reserved and cannot
-    be declared in contract source.
+29. Contract member names `selector` are reserved for builtin `selector("...")`
+    and cannot be declared as function/event/storage names.
+30. Contract member names using internal prefix `__tol_` are reserved and
+    cannot be declared as function/event/storage names.
 
 Partially implemented:
 

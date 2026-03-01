@@ -645,6 +645,32 @@ func TestCheckRejectsReservedFunctionNamePrefixTol(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsReservedEventAndStorageNames(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Storage: &ast.StorageDecl{
+				Slots: []ast.StorageSlot{
+					{Name: "selector", Type: "u256"},
+					{Name: "__tol_internal", Type: "u256"},
+				},
+			},
+			Events: []ast.EventDecl{
+				{Name: "selector"},
+				{Name: "__tol_internal"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsConflictingVisibilityModifiers(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

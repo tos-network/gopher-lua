@@ -89,6 +89,21 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			funcArity[fn.Name] = len(fn.Params)
 		}
 		for _, ev := range m.Contract.Events {
+			evName := strings.TrimSpace(ev.Name)
+			if evName == "selector" {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaReservedName,
+					Message: "event name 'selector' is reserved for builtin selector(...)",
+					Span:    defaultSpan(filename),
+				})
+			}
+			if strings.HasPrefix(evName, "__tol_") {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaReservedName,
+					Message: fmt.Sprintf("event name '%s' uses reserved internal prefix '__tol_'", evName),
+					Span:    defaultSpan(filename),
+				})
+			}
 			diags = append(diags, duplicateParamDiagnostics(filename, "event", ev.Name, ev.Params)...)
 			if _, exists := eventArity[ev.Name]; exists {
 				diags = append(diags, diag.Diagnostic{
@@ -105,6 +120,21 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		if m.Contract.Storage != nil {
 			slotSeen := map[string]struct{}{}
 			for _, slot := range m.Contract.Storage.Slots {
+				slotName := strings.TrimSpace(slot.Name)
+				if slotName == "selector" {
+					diags = append(diags, diag.Diagnostic{
+						Code:    diag.CodeSemaReservedName,
+						Message: "storage slot name 'selector' is reserved for builtin selector(...)",
+						Span:    defaultSpan(filename),
+					})
+				}
+				if strings.HasPrefix(slotName, "__tol_") {
+					diags = append(diags, diag.Diagnostic{
+						Code:    diag.CodeSemaReservedName,
+						Message: fmt.Sprintf("storage slot name '%s' uses reserved internal prefix '__tol_'", slotName),
+						Span:    defaultSpan(filename),
+					})
+				}
 				if _, ok := slotSeen[slot.Name]; ok {
 					diags = append(diags, diag.Diagnostic{
 						Code:    diag.CodeSemaDuplicateSlot,

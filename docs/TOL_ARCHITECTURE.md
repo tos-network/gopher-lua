@@ -99,7 +99,7 @@ Current parser/sema coverage in this branch:
    (`return`/`revert`, loop-body `break`/`continue`, terminating `if/else`),
    selector-override visibility checks (`@selector` only on public/external),
    reserved builtin/internal-name checks (`selector` and `__tol_*`
-   cannot be declared as function names),
+   cannot be declared as contract member names),
    `@selector("0x........")` format/uniqueness checks for
    `public`/`external` dispatch entries, and selector expression validation
    (`selector("sig")` literal-only, `this/Contract.fn.selector` target
