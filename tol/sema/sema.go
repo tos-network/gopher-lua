@@ -933,7 +933,17 @@ func loopConditionAlwaysTrue(s ast.Statement) bool {
 
 func isLiteralTrueIdentExpr(e *ast.Expr) bool {
 	root := stripParens(e)
-	return root != nil && root.Kind == "ident" && strings.TrimSpace(root.Value) == "true"
+	if root == nil {
+		return false
+	}
+	if root.Kind == "ident" && strings.TrimSpace(root.Value) == "true" {
+		return true
+	}
+	if root.Kind == "bool" {
+		v := strings.ToLower(strings.TrimSpace(root.Value))
+		return v == "true"
+	}
+	return false
 }
 
 type localScope struct {

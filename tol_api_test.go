@@ -961,6 +961,22 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLAcceptsNonVoidInfiniteForTrueGuaranteedReturn(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn f() -> (out: u256) public {
+    for ; true; {
+      return 1;
+    }
+  }
+}
+`)
+	if _, err := BuildIRFromTOL(src, "<tol>"); err != nil {
+		t.Fatalf("expected success, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsUnreachableStmtAfterReturn(t *testing.T) {
 	src := []byte(`
 tol 0.2

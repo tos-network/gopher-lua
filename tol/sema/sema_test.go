@@ -1623,6 +1623,36 @@ func TestCheckAcceptsNonVoidFunctionInfiniteForWithGuaranteedRevert(t *testing.T
 	}
 }
 
+func TestCheckAcceptsNonVoidFunctionInfiniteForTrueWithGuaranteedReturn(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Returns: []ast.FieldDecl{
+						{Name: "out", Type: "u256"},
+					},
+					Body: []ast.Statement{
+						{
+							Kind: "for",
+							Cond: &ast.Expr{Kind: "ident", Value: "true"},
+							Body: []ast.Statement{
+								{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "7"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsUnreachableStmtAfterReturn(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
