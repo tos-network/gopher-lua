@@ -794,6 +794,8 @@ Implemented:
 25. Function parameter names must not collide with function return-field names.
 26. Local `let` declarations are uniqueness-checked per lexical scope
     (same-scope duplicates rejected; nested-scope shadowing allowed).
+27. Unreachable statements are rejected after terminal control-flow
+    (`return`, `revert`, or `if/else` where both branches terminate).
 
 Partially implemented:
 

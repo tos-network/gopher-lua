@@ -854,6 +854,87 @@ func TestCheckAcceptsNonVoidFunctionAllPathsReturnOrRevert(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsUnreachableStmtAfterReturn(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{Kind: "return"},
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsUnreachableStmtAfterTerminatingIf(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind: "if",
+							Cond: &ast.Expr{Kind: "ident", Value: "flag"},
+							Then: []ast.Statement{{Kind: "return"}},
+							Else: []ast.Statement{{Kind: "revert", Expr: &ast.Expr{Kind: "string", Value: "\"X\""}}},
+						},
+						{Kind: "let", Name: "x", Type: "u256", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030, got: %v", diags)
+	}
+}
+
+func TestCheckAllowsStmtAfterNonTerminatingIf(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Body: []ast.Statement{
+						{
+							Kind: "if",
+							Cond: &ast.Expr{Kind: "ident", Value: "flag"},
+							Then: []ast.Statement{{Kind: "return"}},
+						},
+						{Kind: "return"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if diags.HasErrors() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
 func TestCheckRejectsConstructorReturnValue(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

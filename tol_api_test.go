@@ -444,6 +444,25 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsUnreachableStmtAfterReturn(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn run() public {
+    return;
+    let x: u256 = 1;
+  }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected unreachable statement error")
+	}
+	if !strings.Contains(err.Error(), "TOL2030") {
+		t.Fatalf("expected TOL2030 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
 	src := []byte(`
 tol 0.2
