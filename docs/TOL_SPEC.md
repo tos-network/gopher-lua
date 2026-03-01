@@ -838,6 +838,8 @@ Implemented:
 33. `.toi` textual interface generation baseline is available:
     deterministic extraction from contract AST for `public`/`external` functions
     (with optional `@selector` lines) plus event signatures.
+    `ValidateTOIText` provides lightweight structural checks, and `.tor` decode
+    validates embedded `.toi` entries.
 
 Partially implemented:
 

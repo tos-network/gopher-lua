@@ -240,6 +240,11 @@ func DecodeTOR(data []byte) (*TORArtifact, error) {
 				return nil, fmt.Errorf("invalid .toc entry %q: %w", name, err)
 			}
 		}
+		if strings.HasSuffix(strings.ToLower(name), ".toi") {
+			if err := ValidateTOIText(body); err != nil {
+				return nil, fmt.Errorf("invalid .toi entry %q: %w", name, err)
+			}
+		}
 	}
 	return &TORArtifact{
 		ManifestJSON: manifest,

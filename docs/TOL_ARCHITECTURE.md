@@ -125,7 +125,8 @@ Current parser/sema coverage in this branch:
      fallback, or deterministic `UNKNOWN_SELECTOR`.
    Public API now also includes deterministic `.toc` artifact packing/unpacking
    (`CompileTOLToTOI` / `CompileTOLToTOIWithOptions` /
-   `BuildTOIFromModule` / `BuildTOIFromModuleWithOptions` / `CompileTOLToTOC` /
+   `BuildTOIFromModule` / `BuildTOIFromModuleWithOptions` / `ValidateTOIText` /
+   `CompileTOLToTOC` /
    `EncodeTOC` / `DecodeTOC` / `VerifyTOCSourceHash`) with `TOC\0` magic,
    metadata, ABI/storage JSON payloads, and keccak256 source/bytecode hashes;
    decode path performs strict integrity checks (including metadata JSON validity)
@@ -133,7 +134,7 @@ Current parser/sema coverage in this branch:
    Packaging API now also includes deterministic `.tor` archive pack/unpack
    (`EncodeTOR` / `DecodeTOR` / `TORPackageHash` / `CompileTOLToTOR`) with canonical entry ordering
    and safe-path validation; manifest contract file references are checked,
-   and `DecodeTOR` validates embedded `.toc` entries.
+   and `DecodeTOR` validates embedded `.toc`/`.toi` entries.
    Storage lowering in this direct-IR path now supports deterministic subset
    operations (scalar/mapping/array core access), while canonical slot hashing
    and persistent host-backed storage semantics remain to be completed.

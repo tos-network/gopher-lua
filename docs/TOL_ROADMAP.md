@@ -57,6 +57,7 @@ Recent verifier hardening completed in this phase:
    - deterministic `.toi` generation API
      (`CompileTOLToTOI`/`CompileTOLToTOIWithOptions`/
       `BuildTOIFromModule`/`BuildTOIFromModuleWithOptions`)
+     plus lightweight `.toi` structural validator (`ValidateTOIText`)
      and CLI output path `tolang -ctoi <out.toi> <input.tol>`
      with optional interface-name override `-ctoiname`
    - deterministic `.toc` artifact encode/decode API (`TOC\0` magic)
@@ -74,7 +75,7 @@ Recent verifier hardening completed in this phase:
      with canonical ordering and manifest/path validation
      (`manifest.name`/`manifest.version` required)
      plus manifest contract-reference file existence checks
-     and decode-time `.toc` entry verification
+     and decode-time `.toc`/`.toi` entry verification
    - one-shot `.tol` -> `.tor` API path `CompileTOLToTOR` (minimal manifest + `.toc` + `.toi`)
    - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
      and archive inspection

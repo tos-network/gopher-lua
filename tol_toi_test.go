@@ -94,3 +94,25 @@ contract Demo {
 		t.Fatalf("expected custom interface name, got:\n%s", string(toi))
 	}
 }
+
+func TestValidateTOITextAcceptsGeneratedTOI(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	toi, err := CompileTOLToTOI(src, "<tol>")
+	if err != nil {
+		t.Fatalf("compile toi: %v", err)
+	}
+	if err := ValidateTOIText(toi); err != nil {
+		t.Fatalf("expected valid toi text, got: %v", err)
+	}
+}
+
+func TestValidateTOITextRejectsMalformed(t *testing.T) {
+	if err := ValidateTOIText([]byte("not toi")); err == nil {
+		t.Fatalf("expected malformed toi error")
+	}
+}

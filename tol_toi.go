@@ -125,3 +125,28 @@ func renderTOIField(name, typ, fallbackName string) string {
 	}
 	return fmt.Sprintf("%s: %s", n, normalizeTOCType(typ))
 }
+
+// ValidateTOIText performs a lightweight structural validation for textual .toi content.
+func ValidateTOIText(data []byte) error {
+	s := strings.TrimSpace(string(data))
+	if s == "" {
+		return fmt.Errorf("toi text is empty")
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) == 0 {
+		return fmt.Errorf("toi text is empty")
+	}
+	first := strings.TrimSpace(lines[0])
+	if !strings.HasPrefix(first, "tol ") {
+		return fmt.Errorf("toi text must start with 'tol <version>' header")
+	}
+	if !strings.Contains(s, "interface ") {
+		return fmt.Errorf("toi text must contain interface declaration")
+	}
+	open := strings.Count(s, "{")
+	close := strings.Count(s, "}")
+	if open == 0 || close == 0 || open != close {
+		return fmt.Errorf("toi text has unbalanced braces")
+	}
+	return nil
+}

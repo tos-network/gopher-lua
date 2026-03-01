@@ -8,39 +8,42 @@ Scope: File formats, package layout, standard library, and on-chain registry
 
 ## Implementation Snapshot (2026-03-01)
 
-Currently landed in `tolang`:
+### Go API (landed)
 
-- API:
-  - `CompileTOLToTOI(source, name)` / `CompileTOLToTOIWithOptions(...)`
-    -> compile `.tol` to textual `.toi`
-  - `CompileTOLToTOC(source, name)` -> compile `.tol` to deterministic `.toc`
-  - `CompileTOLToTOR(source, name, opts)` -> compile `.tol` to minimal `.tor`
-  - `EncodeTOC(...)` / `DecodeTOC(...)`
-  - `VerifyTOCSourceHash(toc, sourceBytes)`
-  - `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
-    (`manifest.name` and `manifest.version` are required)
-    and `contracts[*].toc/.toi` references must exist in archive entries;
-    `.toc` entries are decode-validated during `DecodeTOR`
-- CLI:
-  - `tolang -ctoi out.toi input.tol`
-  - `tolang -ctoi out.toi -ctoiname MyIface input.tol`
-  - `tolang -ctoc out.toc input.tol`
-  - `tolang -dtoc artifact.toc`
-  - `tolang -dtocj artifact.toc`
-  - `tolang -vtoc artifact.toc`
-  - `tolang -vtoc -vtocsrc source.tol artifact.toc`
-  - `tolang -ctor out.tor <package_dir>`
-  - `tolang -ctor out.tor <contract.tol>` (one-shot: `.tol` -> minimal `.tor`)
-  - one-shot overrides: `-ctorpkg`, `-ctorver`, `-ctorsrc`
-  - `tolang -dtor artifact.tor`
-  - `tolang -dtorj artifact.tor`
-  - `tolang -vtor artifact.tor`
+- `CompileTOLToTOI(source, name)` / `CompileTOLToTOIWithOptions(...)` — emit `.toi`
+- `ValidateTOIText(toiBytes)` — lightweight `.toi` structural validator
+- `CompileTOLToTOC(source, name)` — emit `.toc`
+- `CompileTOLToTOR(source, name, opts)` — one-shot `.tol` → minimal `.tor`
+- `EncodeTOC(...)` / `DecodeTOC(...)` / `VerifyTOCSourceHash(toc, sourceBytes)`
+- `EncodeTOR(manifest, files)` / `DecodeTOR(torBytes)` / `TORPackageHash(torBytes)`
+  (`DecodeTOR` validates embedded `.toc`/`.toi` entries)
 
-Not landed yet:
+### CLI (current — flat-flag style, to be migrated)
 
-- `.toi` import/type-check flow
-- high-level TOR manifest builder command (`tol package ...`)
-- registry resolution (`tor://...`, `toc://...`)
+The current `tolang` binary uses a flat-flag scheme that conflates action + format
+into a single opaque flag (`-ctoc`, `-dtocj`, `-vtor`, etc.). This style is
+**not ergonomic** and will be replaced by the subcommand design specified in §7.
+
+```sh
+# current (legacy, pending migration)
+tolang -ctoc out.toc input.tol
+tolang -ctoi out.toi input.tol
+tolang -dtoc artifact.toc
+tolang -dtocj artifact.toc
+tolang -vtoc artifact.toc
+tolang -vtoc -vtocsrc source.tol artifact.toc
+tolang -ctor out.tor <dir_or_file.tol>
+tolang -ctorpkg name -ctorver 1.0.0 -ctorsrc -ctor out.tor input.tol
+tolang -dtor artifact.tor
+tolang -dtorj artifact.tor
+tolang -vtor artifact.tor
+```
+
+### Not landed yet
+
+- `.toi` import / type-check flow in the compiler
+- Subcommand CLI (`tol compile`, `tol inspect`, `tol verify`, `tol pack`)
+- Registry resolution (`tor://...`, `toc://...`) and `tol install` / `tol publish`
 
 ---
 
