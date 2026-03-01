@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	lua "github.com/tos-network/tolang"
@@ -61,6 +63,28 @@ func TestSubcommandHelpExitCodes(t *testing.T) {
 	}
 	if code := cmdVerify([]string{"--help"}); code != 0 {
 		t.Fatalf("verify --help: got=%d want=0", code)
+	}
+}
+
+func TestCompileHelpIncludesNameOverrideDescription(t *testing.T) {
+	old := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stderr = w
+	code := cmdCompile([]string{"--help"})
+	_ = w.Close()
+	os.Stderr = old
+	out, _ := io.ReadAll(r)
+	_ = r.Close()
+
+	if code != 0 {
+		t.Fatalf("compile --help: got=%d want=0", code)
+	}
+	txt := string(out)
+	if !strings.Contains(txt, "interface name for emit=toi") || !strings.Contains(txt, "toi interface name for emit=tor") {
+		t.Fatalf("compile help missing expected --name description, got:\n%s", txt)
 	}
 }
 

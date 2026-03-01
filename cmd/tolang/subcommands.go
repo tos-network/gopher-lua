@@ -79,7 +79,7 @@ func cmdCompile(args []string) int {
 	fs.StringVar(&emit, "emit", "toc", "emit format: toc|toi|tor")
 	fs.StringVar(&output, "o", "", "output artifact path")
 	fs.StringVar(&output, "output", "", "output artifact path")
-	fs.StringVar(&name, "name", "", "interface name override (toi/tor)")
+	fs.StringVar(&name, "name", "", "name override: interface name for emit=toi, toi interface name for emit=tor")
 	fs.StringVar(&packageName, "package-name", "", "package name override (tor)")
 	fs.StringVar(&packageVersion, "package-version", "0.0.0", "package version override (tor)")
 	fs.BoolVar(&includeSource, "include-source", false, "include source in .tor")
