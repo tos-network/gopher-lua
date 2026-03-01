@@ -16,23 +16,39 @@ func dispatchSubcommand(args []string) (bool, int) {
 	if len(args) == 0 {
 		return false, 0
 	}
-	switch args[0] {
-	case "compile":
-		return true, cmdCompile(args[1:])
-	case "pack":
-		return true, cmdPack(args[1:])
-	case "inspect":
-		return true, cmdInspect(args[1:])
-	case "verify":
-		return true, cmdVerify(args[1:])
+	switch name := args[0]; name {
+	case "compile", "pack", "inspect", "verify":
+		return true, runNamedSubcommand(name, args[1:])
 	case "--version":
 		fmt.Println(lua.PackageCopyRight)
 		return true, 0
-	case "--help", "-h", "help":
+	case "--help", "-h":
 		printRootSubcommandUsage()
 		return true, 0
+	case "help":
+		if len(args) == 1 {
+			printRootSubcommandUsage()
+			return true, 0
+		}
+		return true, runNamedSubcommand(args[1], []string{"--help"})
 	default:
 		return false, 0
+	}
+}
+
+func runNamedSubcommand(name string, args []string) int {
+	switch name {
+	case "compile":
+		return cmdCompile(args)
+	case "pack":
+		return cmdPack(args)
+	case "inspect":
+		return cmdInspect(args)
+	case "verify":
+		return cmdVerify(args)
+	default:
+		fmt.Printf("unknown subcommand %q\n", name)
+		return 1
 	}
 }
 
@@ -50,6 +66,7 @@ Subcommands:
 Global:
   --version print version
   --help    print this help
+  help      print help for a subcommand (e.g., "tol help compile")
 `)
 }
 

@@ -35,6 +35,12 @@ func TestDispatchSubcommandRouting(t *testing.T) {
 	if handled, code := dispatchSubcommand([]string{"--version"}); !handled || code != 0 {
 		t.Fatalf("--version should be handled with code 0, got handled=%v code=%d", handled, code)
 	}
+	if handled, code := dispatchSubcommand([]string{"help", "compile"}); !handled || code != 0 {
+		t.Fatalf("help compile should be handled with code 0, got handled=%v code=%d", handled, code)
+	}
+	if handled, code := dispatchSubcommand([]string{"help", "nope"}); !handled || code != 1 {
+		t.Fatalf("help unknown should be handled with code 1, got handled=%v code=%d", handled, code)
+	}
 }
 
 func TestSubcommandHelpExitCodes(t *testing.T) {
