@@ -162,6 +162,22 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsDuplicateFnVisibilityModifier(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public public { return; }
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected duplicate modifier error")
+	}
+	if !strings.Contains(err.Error(), "TOL2015") {
+		t.Fatalf("expected TOL2015 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsSelectorOverrideOnNonExternalFunction(t *testing.T) {
 	src := []byte(`
 tol 0.2

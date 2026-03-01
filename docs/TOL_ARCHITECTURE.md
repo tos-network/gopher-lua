@@ -66,8 +66,8 @@ Current parser/sema coverage in this branch:
    version gate, missing contract, duplicate storage slots, duplicate function
    names (no overload yet), break/continue loop-context validation,
    `set` target assignability checks,
-   function modifier validation (unsupported/conflicting combinations),
-   constructor modifier validation (supported subset + conflict checks),
+   function modifier validation (unsupported/conflicting/duplicate combinations),
+   constructor modifier validation (supported subset + conflict/duplicate checks),
    duplicate parameter-name checks, return-value shape checks
    (void/non-void/constructor/fallback),
    storage-access shape checks for implemented subset

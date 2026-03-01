@@ -767,7 +767,8 @@ Implemented:
     scalar slot reads/writes, mapping reads/writes (with exact declared key depth),
     and top-level storage dynamic array `arr[i]`, `arr.length`, `arr.push(v)`.
 13. Early semantic verifier now rejects unsupported/conflicting function modifiers,
-    duplicate parameter names, and invalid return-value usage
+    duplicate function/constructor modifiers, duplicate parameter names,
+    and invalid return-value usage
     (void/non-void function and constructor/fallback return shape checks).
     Constructor modifier subset is also validated (allowed subset + conflict checks).
 14. Early semantic verifier validates storage-access shape for implemented subset:

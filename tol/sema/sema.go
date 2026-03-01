@@ -1333,7 +1333,13 @@ func validateFunctionModifiers(filename string, fnName string, modifiers []strin
 	for _, m := range modifiers {
 		switch m {
 		case "public", "external", "internal", "private":
-			if vis != "" && vis != m {
+			if vis == m {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("duplicate visibility modifier '%s' on function '%s'", m, fnName),
+					Span:    defaultSpan(filename),
+				})
+			} else if vis != "" {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaConflictingModifier,
 					Message: fmt.Sprintf("conflicting visibility modifiers '%s' and '%s' on function '%s'", vis, m, fnName),
@@ -1342,6 +1348,13 @@ func validateFunctionModifiers(filename string, fnName string, modifiers []strin
 			}
 			vis = m
 		case "view":
+			if hasView {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("duplicate modifier 'view' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
 			if hasPayable {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaConflictingModifier,
@@ -1358,6 +1371,13 @@ func validateFunctionModifiers(filename string, fnName string, modifiers []strin
 			}
 			hasView = true
 		case "pure":
+			if hasPure {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("duplicate modifier 'pure' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
 			if hasPayable {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaConflictingModifier,
@@ -1374,6 +1394,13 @@ func validateFunctionModifiers(filename string, fnName string, modifiers []strin
 			}
 			hasPure = true
 		case "payable":
+			if hasPayable {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("duplicate modifier 'payable' on function '%s'", fnName),
+					Span:    defaultSpan(filename),
+				})
+			}
 			if hasView {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaConflictingModifier,
@@ -1408,7 +1435,13 @@ func validateConstructorModifiers(filename string, modifiers []string) diag.Diag
 	for _, m := range modifiers {
 		switch m {
 		case "public", "internal":
-			if vis != "" && vis != m {
+			if vis == m {
+				diags = append(diags, diag.Diagnostic{
+					Code:    diag.CodeSemaConflictingModifier,
+					Message: fmt.Sprintf("duplicate constructor visibility modifier '%s'", m),
+					Span:    defaultSpan(filename),
+				})
+			} else if vis != "" {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaConflictingModifier,
 					Message: fmt.Sprintf("conflicting constructor visibility modifiers '%s' and '%s'", vis, m),

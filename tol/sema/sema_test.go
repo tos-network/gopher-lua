@@ -573,6 +573,28 @@ func TestCheckRejectsConflictingVisibilityModifiers(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsDuplicateVisibilityModifier(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:      "f",
+					Modifiers: []string{"public", "public"},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2015") {
+		t.Fatalf("expected TOL2015, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsConflictingMutabilityModifiers(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
@@ -582,6 +604,28 @@ func TestCheckRejectsConflictingMutabilityModifiers(t *testing.T) {
 				{
 					Name:      "f",
 					Modifiers: []string{"view", "payable"},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2015") {
+		t.Fatalf("expected TOL2015, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsDuplicateMutabilityModifier(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name:      "f",
+					Modifiers: []string{"view", "view"},
 				},
 			},
 		},
@@ -668,6 +712,25 @@ func TestCheckRejectsConflictingConstructorVisibility(t *testing.T) {
 			Name: "Demo",
 			Constructor: &ast.ConstructorDecl{
 				Modifiers: []string{"public", "internal"},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2015") {
+		t.Fatalf("expected TOL2015, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsDuplicateConstructorVisibility(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Constructor: &ast.ConstructorDecl{
+				Modifiers: []string{"public", "public"},
 			},
 		},
 	}
