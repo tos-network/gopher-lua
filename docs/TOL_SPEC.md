@@ -789,6 +789,7 @@ Implemented:
 22. If a contract declares events, `emit` must reference a declared event name.
 23. Cross-namespace name collision checks are enforced for this stage
     (`event`/`fn`/`storage slot` identifiers must not collide).
+24. Duplicate-name checks apply to event parameter lists and function return-name lists.
 
 Partially implemented:
 

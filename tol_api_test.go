@@ -351,6 +351,22 @@ contract Demo {
 	}
 }
 
+func TestBuildIRFromTOLRejectsDuplicateEventParams(t *testing.T) {
+	src := []byte(`
+tol 0.2
+contract Demo {
+  event Tick(a: u256, a: u256)
+}
+`)
+	_, err := BuildIRFromTOL(src, "<tol>")
+	if err == nil {
+		t.Fatalf("expected duplicate event param error")
+	}
+	if !strings.Contains(err.Error(), "TOL2016") {
+		t.Fatalf("expected TOL2016 sema error, got: %v", err)
+	}
+}
+
 func TestBuildIRFromTOLRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
 	src := []byte(`
 tol 0.2

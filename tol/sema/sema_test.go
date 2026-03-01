@@ -1483,6 +1483,59 @@ func TestCheckRejectsDuplicateEventDeclarations(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsDuplicateEventParams(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Events: []ast.EventDecl{
+				{
+					Name: "Tick",
+					Params: []ast.FieldDecl{
+						{Name: "a", Type: "u256"},
+						{Name: "a", Type: "u256"},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2016") {
+		t.Fatalf("expected TOL2016, got: %v", diags)
+	}
+}
+
+func TestCheckRejectsDuplicateFunctionReturnNames(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "Demo",
+			Functions: []ast.FunctionDecl{
+				{
+					Name: "f",
+					Returns: []ast.FieldDecl{
+						{Name: "ok", Type: "bool"},
+						{Name: "ok", Type: "bool"},
+					},
+					Body: []ast.Statement{
+						{Kind: "return", Expr: &ast.Expr{Kind: "number", Value: "1"}},
+					},
+				},
+			},
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2016") {
+		t.Fatalf("expected TOL2016, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsEmitUnknownDeclaredEventSet(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",

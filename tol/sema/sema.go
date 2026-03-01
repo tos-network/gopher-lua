@@ -88,6 +88,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 			funcArity[fn.Name] = len(fn.Params)
 		}
 		for _, ev := range m.Contract.Events {
+			diags = append(diags, duplicateParamDiagnostics(filename, "event", ev.Name, ev.Params)...)
 			if _, exists := eventArity[ev.Name]; exists {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaDuplicateEvent,
@@ -131,6 +132,7 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 		selectorSeen := map[string]string{}
 		for _, fn := range m.Contract.Functions {
 			diags = append(diags, duplicateParamDiagnostics(filename, "function", fn.Name, fn.Params)...)
+			diags = append(diags, duplicateParamDiagnostics(filename, "returns", fn.Name, fn.Returns)...)
 			if _, ok := funcSeen[fn.Name]; ok {
 				diags = append(diags, diag.Diagnostic{
 					Code:    diag.CodeSemaDuplicateFunction,
@@ -1211,8 +1213,13 @@ func duplicateParamDiagnostics(filename, ownerKind, ownerName string, params []a
 		}
 		if _, ok := seen[name]; ok {
 			subject := ownerKind
-			if ownerKind == "function" {
+			switch ownerKind {
+			case "function":
 				subject = fmt.Sprintf("function '%s'", ownerName)
+			case "event":
+				subject = fmt.Sprintf("event '%s'", ownerName)
+			case "returns":
+				subject = fmt.Sprintf("return list of function '%s'", ownerName)
 			}
 			out = append(out, diag.Diagnostic{
 				Code:    diag.CodeSemaDuplicateParam,
