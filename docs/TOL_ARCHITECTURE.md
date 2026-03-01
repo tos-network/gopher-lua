@@ -76,6 +76,7 @@ Current parser/sema coverage in this branch:
    contract-local function call arity checks
    (`fn(...)`, `this.fn(...)`, `Contract.fn(...)`), assignment-expression target checks,
    contract-scoped member-call target resolution checks,
+   contract-scoped member-call visibility checks (`public/external` only),
    literal-identifier assignment-target rejection (`true`/`false`/`nil`),
    selector-member assignment-target rejection (`*.selector` is read-only),
    assignment-expression placement checks (value-context rejection),

@@ -1174,6 +1174,12 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 					Message: fmt.Sprintf("contract call target function '%s' not found", name),
 					Span:    defaultSpan(filename),
 				})
+			} else if vis := funcVis[name]; vis != "public" && vis != "external" {
+				*diags = append(*diags, diag.Diagnostic{
+					Code:    diag.CodeSemaCallVisibility,
+					Message: fmt.Sprintf("contract-scoped call target function '%s' is not externally dispatchable", name),
+					Span:    defaultSpan(filename),
+				})
 			}
 		}
 		checkExpr(contractName, funcVis, funcArity, filename, e.Callee, diags)
