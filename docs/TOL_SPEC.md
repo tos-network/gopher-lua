@@ -871,8 +871,9 @@ Partially implemented:
    dynamic selector expressions are not implemented.
 8. Selector member builtins currently work only for externally dispatchable
    targets in current stage.
-9. `math.binaryLog`/`math.pow2` are implemented; `math.max(xs: i256[])` in spec
-   is not implemented as a dedicated array intrinsic.
+9. `math.binaryLog`/`math.pow2` are implemented;
+   runtime `math.max`/`math.min` now support single table-array argument form
+   (for current runtime integer domain; full signed type semantics remain tracked separately).
 
 Not implemented yet (spec gap):
 

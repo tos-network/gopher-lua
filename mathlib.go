@@ -45,6 +45,16 @@ func mathMax(L *LState) int {
 	if L.GetTop() == 0 {
 		L.RaiseError("wrong number of arguments")
 	}
+	if L.GetTop() == 1 {
+		if tb, ok := L.Get(1).(*LTable); ok {
+			max, ok := tableExtremum(L, tb, true)
+			if !ok {
+				return 0
+			}
+			L.Push(max)
+			return 1
+		}
+	}
 	max := L.CheckNumber(1)
 	top := L.GetTop()
 	for i := 2; i <= top; i++ {
@@ -60,6 +70,16 @@ func mathMax(L *LState) int {
 func mathMin(L *LState) int {
 	if L.GetTop() == 0 {
 		L.RaiseError("wrong number of arguments")
+	}
+	if L.GetTop() == 1 {
+		if tb, ok := L.Get(1).(*LTable); ok {
+			min, ok := tableExtremum(L, tb, false)
+			if !ok {
+				return 0
+			}
+			L.Push(min)
+			return 1
+		}
 	}
 	min := L.CheckNumber(1)
 	top := L.GetTop()
@@ -85,4 +105,45 @@ func mathMod(L *LState) int {
 func mathPow(L *LState) int {
 	L.Push(lNumberPow(L.CheckNumber(1), L.CheckNumber(2)))
 	return 1
+}
+
+func tableExtremum(L *LState, tb *LTable, wantMax bool) (LNumber, bool) {
+	n := tb.Len()
+	if n == 0 {
+		L.RaiseError("math table argument must not be empty")
+		return LNumberZero, false
+	}
+
+	first := tb.RawGetInt(1)
+	out, ok := lvalueToNumber(first)
+	if !ok {
+		L.RaiseError("math table argument must contain only numbers")
+		return LNumberZero, false
+	}
+
+	for i := 2; i <= n; i++ {
+		v, ok := lvalueToNumber(tb.RawGetInt(i))
+		if !ok {
+			L.RaiseError("math table argument must contain only numbers")
+			return LNumberZero, false
+		}
+		c := lNumberCmp(v, out)
+		if (wantMax && c > 0) || (!wantMax && c < 0) {
+			out = v
+		}
+	}
+	return out, true
+}
+
+func lvalueToNumber(v LValue) (LNumber, bool) {
+	switch lv := v.(type) {
+	case LNumber:
+		return lv, true
+	case LString:
+		n, err := parseNumber(string(lv))
+		if err == nil {
+			return n, true
+		}
+	}
+	return LNumberZero, false
 }
