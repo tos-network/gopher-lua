@@ -79,6 +79,22 @@ func Check(filename string, m *ast.Module) (*TypedModule, diag.Diagnostics) {
 	}
 
 	if m.Contract != nil {
+		contractName := strings.TrimSpace(m.Contract.Name)
+		if contractName == "this" || contractName == "selector" {
+			diags = append(diags, diag.Diagnostic{
+				Code:    diag.CodeSemaReservedName,
+				Message: fmt.Sprintf("contract name '%s' is reserved and cannot be declared", contractName),
+				Span:    defaultSpan(filename),
+			})
+		}
+		if strings.HasPrefix(contractName, "__tol_") {
+			diags = append(diags, diag.Diagnostic{
+				Code:    diag.CodeSemaReservedName,
+				Message: fmt.Sprintf("contract name '%s' uses reserved internal prefix '__tol_'", contractName),
+				Span:    defaultSpan(filename),
+			})
+		}
+
 		funcVis := map[string]string{}
 		funcArity := map[string]int{}
 		eventArity := map[string]int{}

@@ -671,6 +671,22 @@ func TestCheckRejectsReservedEventAndStorageNames(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsReservedContractName(t *testing.T) {
+	m := &ast.Module{
+		Version: "0.2",
+		Contract: &ast.ContractDecl{
+			Name: "this",
+		},
+	}
+	_, diags := Check("<test>", m)
+	if !diags.HasErrors() {
+		t.Fatalf("expected diagnostics")
+	}
+	if !strings.Contains(diags.Error(), "TOL2033") {
+		t.Fatalf("expected TOL2033, got: %v", diags)
+	}
+}
+
 func TestCheckRejectsConflictingVisibilityModifiers(t *testing.T) {
 	m := &ast.Module{
 		Version: "0.2",
