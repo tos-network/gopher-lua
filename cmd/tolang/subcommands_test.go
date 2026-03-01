@@ -405,3 +405,40 @@ func TestCmdCompileRejectsInvalidFlagCombinations(t *testing.T) {
 		t.Fatalf("--include-source with emit=toc: got=%d want=1", code)
 	}
 }
+
+func TestCmdPackRejectsMissingOutputOrBadInput(t *testing.T) {
+	dir := t.TempDir()
+	if code := cmdPack([]string{dir}); code != 1 {
+		t.Fatalf("pack missing -o should fail: got=%d want=1", code)
+	}
+
+	file := filepath.Join(dir, "not_dir.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if code := cmdPack([]string{"-o", filepath.Join(dir, "x.tor"), file}); code != 1 {
+		t.Fatalf("pack non-directory input should fail: got=%d want=1", code)
+	}
+}
+
+func TestCmdInspectRejectsUnknownArtifact(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.bin")
+	if err := os.WriteFile(path, []byte("not-an-artifact"), 0o644); err != nil {
+		t.Fatalf("write bad artifact: %v", err)
+	}
+	if code := cmdInspect([]string{path}); code != 1 {
+		t.Fatalf("inspect unknown artifact should fail: got=%d want=1", code)
+	}
+}
+
+func TestCmdVerifyRejectsUnknownArtifact(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.bin")
+	if err := os.WriteFile(path, []byte("not-an-artifact"), 0o644); err != nil {
+		t.Fatalf("write bad artifact: %v", err)
+	}
+	if code := cmdVerify([]string{path}); code != 1 {
+		t.Fatalf("verify unknown artifact should fail: got=%d want=1", code)
+	}
+}

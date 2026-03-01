@@ -569,6 +569,12 @@ tol verify trc20-base-1.0.0.tor
 
 Exit codes: `0` = ok, `1` = invalid artifact, `2` = source hash mismatch.
 
+Error behavior notes:
+
+- Unknown input type (not `.toc`/`.toi`/`.tor` and no recognized magic/content)
+  returns exit code `1`.
+- `--source` is only valid when verifying a `.toc` artifact.
+
 ### 7.5 `tol install` — install from registry
 
 ```sh
