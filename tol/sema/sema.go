@@ -1412,8 +1412,14 @@ func checkExpr(contractName string, funcVis map[string]string, funcArity map[str
 		checkExpr(contractName, funcVis, funcArity, filename, e.Right, diags)
 	case "paren":
 		checkExpr(contractName, funcVis, funcArity, filename, e.Left, diags)
+	case "ident", "number", "string":
+		// Leaf expressions in current stage.
 	default:
-		// leaf nodes
+		*diags = append(*diags, diag.Diagnostic{
+			Code:    diag.CodeSemaInvalidStmtShape,
+			Message: fmt.Sprintf("unsupported expression kind '%s' in current verifier stage", e.Kind),
+			Span:    defaultSpan(filename),
+		})
 	}
 }
 
