@@ -130,6 +130,13 @@ func DecodeTOR(data []byte) (*TORArtifact, error) {
 	if err := validateTORManifest(manifest); err != nil {
 		return nil, err
 	}
+	for name, body := range files {
+		if strings.HasSuffix(strings.ToLower(name), ".toc") {
+			if _, err := DecodeTOC(body); err != nil {
+				return nil, fmt.Errorf("invalid .toc entry %q: %w", name, err)
+			}
+		}
+	}
 	return &TORArtifact{
 		ManifestJSON: manifest,
 		Files:        files,

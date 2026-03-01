@@ -70,6 +70,7 @@ Recent verifier hardening completed in this phase:
    - deterministic `.tor` archive API (`EncodeTOR`/`DecodeTOR`/`TORPackageHash`)
      with canonical ordering and manifest/path validation
      (`manifest.name`/`manifest.version` required)
+     and decode-time `.toc` entry verification
    - CLI package/dump path (`-ctor`, `-dtor`, `-dtorj`) for directory packaging
      and archive inspection
    - CLI strict TOR validation path (`-vtor`)

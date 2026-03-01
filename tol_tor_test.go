@@ -6,10 +6,26 @@ import (
 	"testing"
 )
 
+func mustCompileTOCTestArtifact(t *testing.T) []byte {
+	t.Helper()
+	src := []byte(`
+tol 0.2
+contract Demo {
+  fn ping() public { return; }
+}
+`)
+	toc, err := CompileTOLToTOC(src, "<tol>")
+	if err != nil {
+		t.Fatalf("compile toc: %v", err)
+	}
+	return toc
+}
+
 func TestEncodeDecodeTORRoundTrip(t *testing.T) {
 	manifest := []byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toc":"bytecode/Demo.toc"}]}`)
+	toc := mustCompileTOCTestArtifact(t)
 	files := map[string][]byte{
-		"bytecode/Demo.toc":    []byte("toc-bytes"),
+		"bytecode/Demo.toc":    toc,
 		"interfaces/IDemo.toi": []byte("interface-bytes"),
 	}
 
@@ -35,8 +51,8 @@ func TestEncodeDecodeTORRoundTrip(t *testing.T) {
 	if string(decoded.ManifestJSON) != string(manifest) {
 		t.Fatalf("unexpected manifest: %s", string(decoded.ManifestJSON))
 	}
-	if got := string(decoded.Files["bytecode/Demo.toc"]); got != "toc-bytes" {
-		t.Fatalf("unexpected bytecode entry: %q", got)
+	if !bytes.Equal(decoded.Files["bytecode/Demo.toc"], toc) {
+		t.Fatalf("unexpected bytecode entry")
 	}
 	if got := string(decoded.Files["interfaces/IDemo.toi"]); got != "interface-bytes" {
 		t.Fatalf("unexpected interface entry: %q", got)
@@ -119,6 +135,19 @@ func TestDecodeTORRejectsManifestMissingRequiredFields(t *testing.T) {
 	}
 	if _, err := DecodeTOR(buf.Bytes()); err == nil {
 		t.Fatalf("expected missing version error")
+	}
+}
+
+func TestDecodeTORRejectsInvalidTOCEntry(t *testing.T) {
+	manifest := []byte(`{"name":"demo","version":"1.0.0","contracts":[{"name":"Demo","toc":"bytecode/Demo.toc"}]}`)
+	tor, err := EncodeTOR(manifest, map[string][]byte{
+		"bytecode/Demo.toc": []byte("not-a-toc"),
+	})
+	if err != nil {
+		t.Fatalf("encode tor: %v", err)
+	}
+	if _, err := DecodeTOR(tor); err == nil {
+		t.Fatalf("expected invalid toc entry error")
 	}
 }
 

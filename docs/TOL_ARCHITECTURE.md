@@ -131,7 +131,7 @@ Current parser/sema coverage in this branch:
    before returning artifact data.
    Packaging API now also includes deterministic `.tor` archive pack/unpack
    (`EncodeTOR` / `DecodeTOR` / `TORPackageHash`) with canonical entry ordering
-   and safe-path validation.
+   and safe-path validation; `DecodeTOR` validates embedded `.toc` entries.
    Storage lowering in this direct-IR path now supports deterministic subset
    operations (scalar/mapping/array core access), while canonical slot hashing
    and persistent host-backed storage semantics remain to be completed.
