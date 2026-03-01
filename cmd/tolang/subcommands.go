@@ -19,7 +19,7 @@ func dispatchSubcommand(args []string) (bool, int) {
 	switch name := args[0]; name {
 	case "compile", "pack", "inspect", "verify":
 		return true, runNamedSubcommand(name, args[1:])
-	case "--version":
+	case "--version", "version":
 		fmt.Println(lua.PackageCopyRight)
 		return true, 0
 	case "--help", "-h":

@@ -454,6 +454,8 @@ global flags (`--version`, `--help`) appear before the subcommand.
 tol <subcommand> [flags] <inputs...>
 ```
 
+`tol version` and `tol --version` are equivalent.
+
 ### 7.1 `tol compile` — compile TOL source
 
 ```sh
